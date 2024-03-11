@@ -3,8 +3,8 @@ const fs = require('fs');
 const { parse } = require('csv-parse/sync');
 require('dotenv').config();
 
-//const uri = `mongodb+srv://${process.env.MONGO_ACCESS_USERID}:${process.env.MONGO_ACCESS_ACCESS_KEY}@${process.env.MONGO_CLUSTER_ADDRESS}/${process.env.MONGO_DATABASE_NAME}?retryWrites=true&w=majority&appName=${process.env.MONGO_DATABASE_NAME}`;
-const uri = `mongodb+srv://${"roberttabor2001"}:${"vKZMZeVWenjgSBRQ"}@${"clothingitems.kertjvk.mongodb.net"}/${"clothingDB"}?retryWrites=true&w=majority&appName=${"clothingDB"}`;
+const uri = `mongodb+srv://${process.env.MONGO_ACCESS_USERID}:${process.env.MONGO_ACCESS_ACCESS_KEY}@${process.env.MONGO_CLUSTER_ADDRESS}/${process.env.MONGO_DATABASE_NAME}?retryWrites=true&w=majority&appName=${process.env.MONGO_DATABASE_NAME}`;
+
 class ClothingItemsService {
     constructor() {
         this.client = new MongoClient(uri);
