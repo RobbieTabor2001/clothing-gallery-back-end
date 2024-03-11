@@ -27,7 +27,7 @@ router.get('/api/images', async (req, res) => {
         let images = await clothingManagementService.getAllImages();
 
         // Shuffle the images array
-        images = images.sort(() => Math.random() - 0.5);
+        //images = images.sort(() => Math.random() - 0.5);
 
         res.json(images);
     } catch (error) {
