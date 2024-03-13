@@ -1,1 +1,0 @@
-# clothing-gallery-back-end

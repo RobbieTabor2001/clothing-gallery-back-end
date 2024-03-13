@@ -1,6 +1,7 @@
 const { MongoClient, ObjectId } = require("mongodb");
 require('dotenv').config();
 
+
 // Construct the MongoDB URI using environment variables
 const uri = `mongodb+srv://${process.env.MONGO_ACCESS_USERID}:${process.env.MONGO_ACCESS_ACCESS_KEY}@${process.env.MONGO_CLUSTER_ADDRESS}/${process.env.MONGO_DATABASE_NAME}?retryWrites=true&w=majority&appName=${process.env.MONGO_DATABASE_NAME}`;
 
@@ -14,11 +15,11 @@ class ClothingImageService {
     async connect() {
         try {
             await this.client.connect();
-            console.log("Connected to MongoDB for ClothingImageService");
+         //   //console.log("Connected to MongoDB for ClothingImageService");
             this.db = this.client.db(process.env.MONGO_DATABASE_NAME);
             this.collection = this.db.collection("clothingImage");
         } catch (error) {
-            console.error("Failed to connect to MongoDB for ClothingImageService", error);
+          //  console.error("Failed to connect to MongoDB for ClothingImageService", error);
             throw error;
         }
     }
@@ -26,9 +27,9 @@ class ClothingImageService {
     async disconnect() {
         try {
             await this.client.close();
-            console.log("Disconnected from MongoDB for ClothingImageService");
+           // //console.log("Disconnected from MongoDB for ClothingImageService");
         } catch (error) {
-            console.error("Failed to disconnect from MongoDB for ClothingImageService", error);
+           // console.error("Failed to disconnect from MongoDB for ClothingImageService", error);
             throw error;
         }
     }
@@ -36,7 +37,7 @@ class ClothingImageService {
     async findAllImages() {
         try {
             const images = await this.collection.find({}).toArray();
-            console.log("Fetched all images");
+           // //console.log("Fetched all images");
             return images;
         } catch (error) {
             console.error("Error fetching all images:", error);
@@ -48,14 +49,14 @@ class ClothingImageService {
         try {
             const image = await this.collection.findOne({ _id: new ObjectId(id) });
             if (image) {
-                console.log("Fetched image by ID:", id);
+            //    //console.log("Fetched image by ID:", id);
                 return image;
             } else {
-                console.log("No image found with ID:", id);
+              //  //console.log("No image found with ID:", id);
                 return null;
             }
         } catch (error) {
-            console.error("Error fetching image by ID:", error);
+          //  console.error("Error fetching image by ID:", error);
             throw error;
         }
     }
@@ -64,13 +65,13 @@ class ClothingImageService {
         try {
             const result = await this.collection.deleteOne({ _id: new ObjectId(id) });
             if (result.deletedCount === 1) {
-                console.log("Successfully deleted one image.");
+              //  //console.log("Successfully deleted one image.");
             } else {
-                console.log("No images matched the query. Deleted 0 images.");
+             //   //console.log("No images matched the query. Deleted 0 images.");
             }
             return result;
         } catch (error) {
-            console.error("Error deleting image by ID:", error);
+           // console.error("Error deleting image by ID:", error);
             throw error;
         }
     }
@@ -79,59 +80,66 @@ class ClothingImageService {
         try {
             const result = await this.collection.updateOne({ _id: new ObjectId(id) }, { $set: updateDoc });
             if (result.matchedCount === 1) {
-                console.log(`Document with ID ${id} updated.`);
+               // //console.log(`Document with ID ${id} updated.`);
             } else {
-                console.log(`No documents matched the query for ID ${id}. Update operation was not performed.`);
+               // //console.log(`No documents matched the query for ID ${id}. Update operation was not performed.`);
             }
             return result;
         } catch (error) {
-            console.error("Error updating image by ID:", error);
+            //console.error("Error updating image by ID:", error);
             throw error;
         }
     }
 
-    async bulkInsertItemsWithImagesFromCSV(csvFilePath) {
+    async getImagesForItemById(itemId) {
         try {
-            await this.connect(); // Ensure connection is established
-            
-            const csvData = fs.readFileSync(csvFilePath);
-            const records = csvParse(csvData, {
-                columns: true,
-                skip_empty_lines: true
-            });
+            // Ensure itemId is an ObjectId
+            const itemObjectId = new ObjectId(itemId);
 
-            for (const record of records) {
-                const { 'Item Name': name, 'File Paths': filePaths, Description: description } = record;
-                const imagePaths = filePaths.split(';');
-                
-                // Insert item without imagePaths
-                const itemResult = await this.itemsCollection.insertOne({ name, description });
-                console.log(`Inserted item: ${name} with ID: ${itemResult.insertedId}`);
-                
-                // Prepare and insert image documents for this item
-                const imageDocuments = imagePaths.map(path => ({
-                    itemId: itemResult.insertedId,
-                    imagePath: path
-                }));
+            // Find images that have the specified itemId
+            const images = await this.collection.find({ itemId: itemObjectId }).toArray();
 
-                if (imageDocuments.length > 0) {
-                    const imagesResult = await this.imagesCollection.insertMany(imageDocuments);
-                    console.log(`Inserted ${imagesResult.insertedCount} images for item: ${name}`);
-                } else {
-                    console.log(`No images to insert for item: ${name}`);
-                }
+            if (images.length > 0) {
+             //   //console.log(`Fetched ${images.length} image(s) for item with ID: ${itemId}`);
+                return images; // Returns an array of image documents
+            } else {
+             //   //console.log(`No images found for item with ID: ${itemId}`);
+                return []; // Returns an empty array if no images are found
             }
-
-            console.log("Completed bulk insert of items and images from CSV.");
         } catch (error) {
-            console.error("Error during bulk insert from CSV:", error);
+           // console.error(`Error fetching images for item with ID: ${itemId}:`, error);
             throw error;
-        } finally {
-            await this.disconnect(); // Clean up connection
         }
     }
 
-    // Additional methods like insert, delete, or update can be added here following a similar pattern
+    async deleteImagesByItemId(itemId) {
+        try {
+            const result = await this.collection.deleteMany({ itemId: new ObjectId(itemId) });
+           // //console.log(`${result.deletedCount} image(s) deleted for item with ID: ${itemId}`);
+            return result;
+        } catch (error) {
+          //  console.error(`Error deleting images for item with ID: ${itemId}:`, error);
+            throw error;
+        }
+    }
+
+    async bulkInsertImages(imagesData) {
+        try {
+            // Ensure that all itemId values are correctly formatted as ObjectId instances
+            const formattedImagesData = imagesData.map(data => ({
+                ...data,
+                itemId: new ObjectId(data.itemId),
+            }));
+
+            const result = await this.collection.insertMany(formattedImagesData);
+          //  //console.log(`${result.insertedCount} images were inserted.`);
+            return result;
+        } catch (error) {
+         //   console.error("Error bulk inserting images:", error);
+            throw error;
+        }
+    }
+
 }
 
 module.exports = ClothingImageService;

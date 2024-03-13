@@ -1,116 +1,161 @@
-const { MongoClient, ObjectId } = require("mongodb");
+const { MongoClient } = require("mongodb");
 require('dotenv').config();
 
+// Import the refactored services
+const ClothingItemsService = require('./ClothingItem/ClothingItemService.js');
+const ClothingImageService = require('./ClothingImage/ClothingImageService');
+
 const uri = `mongodb+srv://${process.env.MONGO_ACCESS_USERID}:${process.env.MONGO_ACCESS_ACCESS_KEY}@${process.env.MONGO_CLUSTER_ADDRESS}/${process.env.MONGO_DATABASE_NAME}?retryWrites=true&w=majority&appName=${process.env.MONGO_DATABASE_NAME}`;
+
 class ClothingManagementService {
     constructor() {
         this.client = new MongoClient(uri);
-        this.db = null;
-        this.itemsCollection = null;
-        this.imagesCollection = null;
+        this.itemsService = new ClothingItemsService();
+        this.imageService = new ClothingImageService();
     }
 
     async connect() {
         try {
-            await this.client.connect();
-            console.log("Connected to MongoDB for ClothingManagementService");
-            this.db = this.client.db(process.env.MONGO_DATABASE_NAME);
-            this.itemsCollection = this.db.collection("clothingItem");
-            this.imagesCollection = this.db.collection("clothingImage");
+            // Connect both services
+            await Promise.all([
+                this.itemsService.connect(),
+                this.imageService.connect(),
+            ]);
+            ////console.log("Connected to MongoDB for ClothingManagementService");
         } catch (error) {
-            console.error("Failed to connect to MongoDB for ClothingManagementService", error);
+           // console.error("Failed to connect for ClothingManagementService", error);
             throw error;
         }
     }
 
     async disconnect() {
         try {
-            await this.client.close();
-            console.log("Disconnected from MongoDB for ClothingManagementService");
+            // Disconnect both services
+            await Promise.all([
+                this.itemsService.disconnect(),
+                this.imageService.disconnect(),
+            ]);
+           // //console.log("Disconnected from MongoDB for ClothingManagementService");
         } catch (error) {
-            console.error("Failed to disconnect from MongoDB for ClothingManagementService", error);
+           // console.error("Failed to disconnect for ClothingManagementService", error);
             throw error;
         }
     }
 
-    // Example method to insert an item and its images
     async insertItemWithImages(itemData, imagePaths) {
         try {
-            // Insert item
-            const itemResult = await this.itemsCollection.insertOne(itemData);
-            console.log(`A document for item was inserted with the _id: ${itemResult.insertedId}`);
+            // Insert item using ClothingItemsService
+            const itemResult = await this.itemsService.insertOneItem(itemData);
+            ////console.log(`A document for item was inserted with the tbort _id: ${itemResult}`);
 
-            // Insert images related to the item
+            // Insert images related to the item using ClothingImageService
             const imagesData = imagePaths.map(path => ({
                 itemId: itemResult.insertedId,
-                imagePath: path
+                imagePath: path,
             }));
-            const imagesResult = await this.imagesCollection.insertMany(imagesData);
-            console.log(`${imagesResult.insertedCount} images were inserted for item with _id: ${itemResult.insertedId}`);
 
-            return { itemResult, imagesResult };
+            const imagesResult = await this.imageService.bulkInsertImages(imagesData); // Assume this method is implemented in ClothingImageService
+           // //console.log(`${imagesResult.length} images were inserted for item with _id: ${itemResult.insertedId}`);
+
+            return itemResult
         } catch (error) {
-            console.error("Error inserting item with images:", error);
-            throw error;
-        }
-    }
-
-    // Example method to delete an item and its related images
-    async deleteItemAndImages(itemId) {
-        try {
-            // Delete item
-            const itemResult = await this.itemsCollection.deleteOne({ _id: new ObjectId(itemId) });
-            console.log(itemResult.deletedCount === 1 ? "Successfully deleted one item." : "No items matched the query. Deleted 0 items.");
-
-            // Delete related images
-            const imagesResult = await this.imagesCollection.deleteMany({ itemId: new ObjectId(itemId) });
-            console.log(`${imagesResult.deletedCount} images were deleted for item with _id: ${itemId}`);
-
-            return { itemResult, imagesResult };
-        } catch (error) {
-            console.error("Error deleting item and its images:", error);
+            //console.error("Error inserting item with images:", error);
             throw error;
         }
     }
 
     async getItemWithImages(itemId) {
         try {
-            await this.connect(); // Ensure connection is established
             
-            const item = await this.itemsCollection.findOne({ _id: new ObjectId(itemId) });
+            // Retrieve the item by ID using ClothingItemsService
+            const item = await this.itemsService.findItemById(itemId);
             if (!item) {
-                console.log("No item found with ID:", itemId);
-                return null; // Or handle as appropriate for your application
+               // //console.log(`No item found with ID: ${itemId}`);
+                return null;
             }
-    
-            const images = await this.imagesCollection.find({ itemId: new ObjectId(itemId) }).toArray();
-            console.log(`Fetched ${images.length} images for item with ID: ${itemId}`);
-            
-            const itemWithImages = {
-                ...item,
-                images: images.map(image => image.imagePath) // Assuming you want to return just the image paths
-            };
-    
-            return itemWithImages;
+            // Retrieve all images for the item using ClothingImageService
+            const images = await this.imageService.getImagesForItemById(itemId);
+            item.images = images; // Add images array to the item object
+         //   //console.log(`Item with images retrieved successfully for ID: ${itemId}`);
+            return item;
         } catch (error) {
-            console.error("Error getting item with images:", error);
+           // console.error(`Error retrieving item with images for ID: ${itemId}:`, error);
             throw error;
         } finally {
-            await this.disconnect(); // Clean up connection
+        
         }
     }
-    async getAllImages() {
-        try {
-            await this.connect(); // Ensure connection is established
-            const images = await this.imagesCollection.find({}).toArray();
-            console.log("Fetched all images");
-            return images;
 
+    async deleteItemWithImages(itemId) {
+        try {
+            
+            // Delete the item by ID using ClothingItemsService
+            const itemResult = await this.itemsService.deleteItemById(itemId);
+            // Delete all images associated with the item using ClothingImageService
+            const imagesResult = await this.imageService.deleteImagesByItemId(itemId); // This assumes a method to delete images by itemId is implemented
+           // //console.log(`Item and its images deleted successfully for ID: ${itemId}`);
+            return { itemResult, imagesResult };
         } catch (error) {
-            console.error("Error getting item with images:", error);
+         //   console.error(`Error deleting item and its images for ID: ${itemId}:`, error);
             throw error;
         } finally {
-            await this.disconnect(); // Clean up connection
+            
+        }
+    }
+
+    async getAllImages() {
+        try {
+            
+            // Use ClothingImageService to get all images
+            const imageDocs = await this.imageService.findAllImages();
+            const images = imageDocs.map(doc => ({
+                id: doc._id,
+                itemId: doc.itemId,
+                imagePath: doc.imagePath
+            }));
+           // //console.log(`Retrieved all images successfully.`);
+            return images;
+        } catch (error) {
+         //   console.error(`Error retrieving all images:`, error);
+            throw error;
+        } finally {
+            
+        }
+    }
+
+    async insertImagesForItem(itemId, imagePaths) {
+        try {
+            
+            // Ensure itemId is correctly formatted as an ObjectId
+            const objectId = itemId;
+
+            // Prepare the images data with the itemId for each imagePath
+            const imagesData = imagePaths.map(imagePath => ({
+                itemId: objectId,
+                imagePath: imagePath,
+            }));
+
+            // Use ClothingImageService to insert images into MongoDB
+            const imagesResult = await this.imageService.bulkInsertImages(imagesData);
+            ////console.log(`${imagesResult.insertedCount} images were inserted for item with _id: ${itemId}`);
+
+            return imagesResult; // This could be adjusted based on what you want to return (e.g., just insertedCount or the full result)
+        } catch (error) {
+          //  console.error(`Error inserting images for item with ID: ${itemId}:`, error);
+            throw error;
+        } finally {
+        }
+    }
+
+    async insertItemOnly(itemData) {
+        try {
+            // Insert item using ClothingItemsService
+            const itemResult = await this.itemsService.insertOneItem(itemData);
+           // //console.log(`A document for item was inserted with the _id: ${itemResult}`);
+            return itemResult
+        } catch (error) {
+          //  console.error("Error inserting item with images:", error);
+            throw error;
         }
     }
 }

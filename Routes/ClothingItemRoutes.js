@@ -20,12 +20,6 @@ router.get('/api/items/:id', async (req, res) => {
         res.status(500).send('Internal Server Error');
     }
 });
-router.get('/', (req, res) => {
-    res.send('API is working');
-});
-router.get('/api', (req, res) => {
-    res.send('API /api is working');
-});
 
 // Route to get all images
 router.get('/api/images', async (req, res) => {
@@ -33,7 +27,7 @@ router.get('/api/images', async (req, res) => {
         let images = await clothingManagementService.getAllImages();
 
         // Shuffle the images array
-        //images = images.sort(() => Math.random() - 0.5);
+        images = images.sort(() => Math.random() - 0.5);
 
         res.json(images);
     } catch (error) {
