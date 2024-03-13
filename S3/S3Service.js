@@ -18,7 +18,7 @@ class S3Service {
         try {
             // This example assumes you want to download the image. If you just want to get the URL, adjust accordingly.
             const data = await this.s3.getObject(params).promise();
-            //console.log(`Image fetched successfully.`);
+            // console.log(`Image fetched successfully.`);
             return data.Body;
         } catch (error) {
             console.error("Error fetching image:", error);
@@ -35,7 +35,7 @@ class S3Service {
         try {
             // Generate a signed URL for temporary access
             const url = await this.s3.getSignedUrlPromise('getObject', params);
-            //console.log(`Image URL generated successfully.`);
+            // console.log(`Image URL generated successfully.`);
             return url;
         } catch (error) {
             console.error("Error generating image URL:", error);
@@ -100,7 +100,7 @@ class S3Service {
             await this.s3.deleteObjects(deleteParams).promise();
 
             if (listedObjects.IsTruncated) await this.deleteFolder(s3FolderName); // Recurse to delete more if the list is truncated
-            //console.log(`${s3FolderName} deleted successfully.`);
+            // console.log(`${s3FolderName} deleted successfully.`);
         } catch (error) {
             console.error("Error deleting folder:", error);
             throw error;
@@ -117,7 +117,7 @@ class S3Service {
         try {
             const data = await this.s3.listObjectsV2(params).promise();
             const images = data.Contents.map(item => item.Key);
-            //console.log(`Images in ${s3FolderName}:`, images);
+            // console.log(`Images in ${s3FolderName}:`, images);
             return images;
         } catch (error) {
             console.error("Error reading folder:", error);
@@ -138,47 +138,56 @@ class S3Service {
             Bucket: this.bucketName,
             Prefix: `${s3FolderPath}`,
         };
-        console.log(s3FolderPath);
+    
         try {
             const listedObjects = await this.s3.listObjectsV2(listParams).promise();
             if (listedObjects.Contents.length === 0) {
-                console.log("No images found in the folder.");
+                // console.log("No images found in the folder.");
                 return {};
             }
     
             // Initialize an empty object to hold our image URLs organized by size
-            let imagesBySize = {
-                "100": "",
-                "132": "",
-                "174": "",
-                "228": "",
-                "300": "",
-                "default": "", // This will be the URL for the 300.webp image
+            let imagesBySize = {};
+    
+            const sizeMap = {
+                '100': 'extrasmall',
+                '132': 'small',
+                '174': 'medium',
+                '228': 'large',
+                '300': 'extralarge',
             };
+    
+            // Default image placeholder
+            let defaultImageUrl = "";
     
             // Iterate over each object in the folder, assuming the file names directly indicate the size
             for (const { Key } of listedObjects.Contents) {
                 const fileName = Key.split('/').pop(); // Extract the file name
-                const size = fileName.split('.')[0]; // Extract the size part of the file name
+                const sizeKey = fileName.split('.')[0]; // Extract the size part of the file name
+                const sizeWord = sizeMap[sizeKey] || 'unknown'; // Map the numeric size to a descriptive word
+                
+                if(sizeWord === 'unknown') continue; // Skip if the size does not match our known sizes
+                
                 // Generate a signed URL for the image
                 const imageUrl = await this.getImageUrl(Key);
                 
-                // Check if the size is one we're organizing by and assign the URL
-                if (imagesBySize.hasOwnProperty(size)) {
-                    imagesBySize[size] = imageUrl;
-                }
+                // Assign the URL to the mapped size
+                imagesBySize[sizeWord] = imageUrl;
+    
+                // Optionally set default to extralarge, or keep the last as a fallback
+                defaultImageUrl = imageUrl;
             }
     
-            // Set the default image URL to be the one for "300.webp"
-            imagesBySize.default = imagesBySize["300"];
+            // Ensure the default key is properly assigned, prefer 'extralarge' or fallback
+            imagesBySize.default = imagesBySize['extralarge'] || defaultImageUrl;
     
-            
             return imagesBySize;
         } catch (error) {
             console.error("Error generating image URLs:", error);
             throw error;
         }
     }
+    
     
     
     async uploadFileToS3(filePath, s3Key) {
@@ -243,7 +252,7 @@ class S3Service {
                 imagesGroupedByItemAndName[itemId][imageName].imageUrls[sizeWord] = imageUrl;
     
                 // Set the 'default' key to point to the 'extrasmall' version (or '300' version explicitly)
-                imagesGroupedByItemAndName[itemId][imageName].imageUrls['default'] = imagesGroupedByItemAndName[itemId][imageName].imageUrls['extrasmall'] || imageUrl;
+                imagesGroupedByItemAndName[itemId][imageName].imageUrls['default'] = imagesGroupedByItemAndName[itemId][imageName].imageUrls['extralarge'] || imageUrl;
             }
     
             // Flatten the structure into an array of items with their images
@@ -257,7 +266,7 @@ class S3Service {
                 });
             });
     
-            console.log('Retrieved all image URLs successfully.');
+            // console.log('Retrieved all image URLs successfully.');
             return allImageURLs;
         } catch (error) {
             console.error("Error retrieving all image URLs:", error);

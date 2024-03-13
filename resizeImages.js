@@ -36,7 +36,7 @@ const resizeImagesInFolders = async (baseFolderPath, outputPath, widths) => {
             .webp({ lossless: true })
             .toFile(outputFilePath);
 
-          console.log(`Image ${file} processed and saved in ${imageFolderPath} as ${outputFileName}`);
+          // console.log(`Image ${file} processed and saved in ${imageFolderPath} as ${outputFileName}`);
         } catch (error) {
           console.error(`Error processing image ${file}:`, error);
         }

@@ -21,7 +21,7 @@ class ClothingManagementService {
                 this.itemsService.connect(),
                 this.imageService.connect(),
             ]);
-            ////console.log("Connected to MongoDB for ClothingManagementService");
+            /// console.log("Connected to MongoDB for ClothingManagementService");
         } catch (error) {
            // console.error("Failed to connect for ClothingManagementService", error);
             throw error;
@@ -35,7 +35,7 @@ class ClothingManagementService {
                 this.itemsService.disconnect(),
                 this.imageService.disconnect(),
             ]);
-           // //console.log("Disconnected from MongoDB for ClothingManagementService");
+           // // console.log("Disconnected from MongoDB for ClothingManagementService");
         } catch (error) {
            // console.error("Failed to disconnect for ClothingManagementService", error);
             throw error;
@@ -46,7 +46,7 @@ class ClothingManagementService {
         try {
             // Insert item using ClothingItemsService
             const itemResult = await this.itemsService.insertOneItem(itemData);
-            ////console.log(`A document for item was inserted with the tbort _id: ${itemResult}`);
+            /// console.log(`A document for item was inserted with the tbort _id: ${itemResult}`);
 
             // Insert images related to the item using ClothingImageService
             const imagesData = imagePaths.map(path => ({
@@ -55,7 +55,7 @@ class ClothingManagementService {
             }));
 
             const imagesResult = await this.imageService.bulkInsertImages(imagesData); // Assume this method is implemented in ClothingImageService
-           // //console.log(`${imagesResult.length} images were inserted for item with _id: ${itemResult.insertedId}`);
+           // // console.log(`${imagesResult.length} images were inserted for item with _id: ${itemResult.insertedId}`);
 
             return itemResult
         } catch (error) {
@@ -70,13 +70,13 @@ class ClothingManagementService {
             // Retrieve the item by ID using ClothingItemsService
             const item = await this.itemsService.findItemById(itemId);
             if (!item) {
-               // //console.log(`No item found with ID: ${itemId}`);
+               // // console.log(`No item found with ID: ${itemId}`);
                 return null;
             }
             // Retrieve all images for the item using ClothingImageService
             const images = await this.imageService.getImagesForItemById(itemId);
             item.images = images; // Add images array to the item object
-         //   //console.log(`Item with images retrieved successfully for ID: ${itemId}`);
+         //   // console.log(`Item with images retrieved successfully for ID: ${itemId}`);
             return item;
         } catch (error) {
            // console.error(`Error retrieving item with images for ID: ${itemId}:`, error);
@@ -93,7 +93,7 @@ class ClothingManagementService {
             const itemResult = await this.itemsService.deleteItemById(itemId);
             // Delete all images associated with the item using ClothingImageService
             const imagesResult = await this.imageService.deleteImagesByItemId(itemId); // This assumes a method to delete images by itemId is implemented
-           // //console.log(`Item and its images deleted successfully for ID: ${itemId}`);
+           // // console.log(`Item and its images deleted successfully for ID: ${itemId}`);
             return { itemResult, imagesResult };
         } catch (error) {
          //   console.error(`Error deleting item and its images for ID: ${itemId}:`, error);
@@ -113,7 +113,7 @@ class ClothingManagementService {
                 itemId: doc.itemId,
                 imagePath: doc.imagePath
             }));
-           // //console.log(`Retrieved all images successfully.`);
+           // // console.log(`Retrieved all images successfully.`);
             return images;
         } catch (error) {
          //   console.error(`Error retrieving all images:`, error);
@@ -137,7 +137,7 @@ class ClothingManagementService {
 
             // Use ClothingImageService to insert images into MongoDB
             const imagesResult = await this.imageService.bulkInsertImages(imagesData);
-            ////console.log(`${imagesResult.insertedCount} images were inserted for item with _id: ${itemId}`);
+            /// console.log(`${imagesResult.insertedCount} images were inserted for item with _id: ${itemId}`);
 
             return imagesResult; // This could be adjusted based on what you want to return (e.g., just insertedCount or the full result)
         } catch (error) {
@@ -151,7 +151,7 @@ class ClothingManagementService {
         try {
             // Insert item using ClothingItemsService
             const itemResult = await this.itemsService.insertOneItem(itemData);
-           // //console.log(`A document for item was inserted with the _id: ${itemResult}`);
+           // // console.log(`A document for item was inserted with the _id: ${itemResult}`);
             return itemResult
         } catch (error) {
           //  console.error("Error inserting item with images:", error);

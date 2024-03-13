@@ -40,9 +40,9 @@ async function processItems() {
     for (const item of itemData) {
         const localFolderPath = path.join(imagesDirectory, item.name.replace(/\s+/g, '')); // Path to the item's images folder
         if (fs.existsSync(localFolderPath) && fs.lstatSync(localFolderPath).isDirectory()) {
-            console.log(`Processing item: ${item.name}`);
+            // console.log(`Processing item: ${item.name}`);
             await combinedService.addNewItemWithImages(localFolderPath, item);
-            console.log(`Successfully processed item: ${item.name}`);
+            // console.log(`Successfully processed item: ${item.name}`);
         } else {
             console.error(`No directory found for item: ${item.name} at ${localFolderPath}`);
         }

@@ -33,7 +33,7 @@ class CombinedClothingService {
             // Use ClothingManagementService to get the item with its MongoDB document images
             const item = await this.clothingManagementService.getItemWithImages(itemId);
             if (!item) {
-                console.log(`No item found with ID: ${itemId}`);
+                // console.log(`No item found with ID: ${itemId}`);
                 return null;
             }
     
@@ -54,7 +54,7 @@ class CombinedClothingService {
                 images: imagesVersions // Storing structured image URLs
             };
     
-            console.log(`Item with image URLs retrieved successfully for ID: ${itemId}`);
+            // console.log(`Item with image URLs retrieved successfully for ID: ${itemId}`);
             return itemWithImageUrls;
         } catch (error) {
             console.error(`Error retrieving item with image URLs for ID: ${itemId}:`, error);
