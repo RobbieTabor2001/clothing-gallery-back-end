@@ -136,57 +136,63 @@ class S3Service {
     async getSingleImageVersions(s3FolderPath) {
         const listParams = {
             Bucket: this.bucketName,
-            Prefix: `${s3FolderPath}`,
+            Prefix: `${s3FolderPath}/`,
         };
     
         try {
             const listedObjects = await this.s3.listObjectsV2(listParams).promise();
             if (listedObjects.Contents.length === 0) {
-                // console.log("No images found in the folder.");
-                return {};
+                return []; // Return an empty array if no images are found
             }
     
-            // Initialize an empty object to hold our image URLs organized by size
-            let imagesBySize = {};
-    
-            const sizeMap = {
-                '100': 'extrasmall',
-                '132': 'small',
-                '174': 'medium',
-                '228': 'large',
-                '300': 'extralarge',
+            // Initialize an object to hold image URLs organized by size, each with png and webp fields
+            let imagesBySize = {
+                extrasmall: { png: null, webp: null },
+                small: { png: null, webp: null },
+                medium: { png: null, webp: null },
+                large: { png: null, webp: null },
+                extralarge: { png: null, webp: null },
             };
     
-            // Default image placeholder
-            let defaultImageUrl = "";
+            const twoDimensionalSizeMap = {
+                '233x233': 'extrasmall',
+                '308x308': 'small',
+                '406x406': 'medium',
+                '532x532': 'large',
+                '700x700': 'extralarge',
+            };
     
-            // Iterate over each object in the folder, assuming the file names directly indicate the size
-            for (const { Key } of listedObjects.Contents) {
-                const fileName = Key.split('/').pop(); // Extract the file name
-                const sizeKey = fileName.split('.')[0]; // Extract the size part of the file name
-                const sizeWord = sizeMap[sizeKey] || 'unknown'; // Map the numeric size to a descriptive word
-                
-                if(sizeWord === 'unknown') continue; // Skip if the size does not match our known sizes
-                
-                // Generate a signed URL for the image
-                const imageUrl = await this.getImageUrl(Key);
-                
-                // Assign the URL to the mapped size
-                imagesBySize[sizeWord] = imageUrl;
+            for (let { Key } of listedObjects.Contents) {
+                const keyParts = Key.split('/');
+                const imageSize = keyParts[keyParts.length - 2];
+                const imageName = keyParts[keyParts.length - 1];
+                const imageSizeKey = twoDimensionalSizeMap[imageSize];
     
-                // Optionally set default to extralarge, or keep the last as a fallback
-                defaultImageUrl = imageUrl;
+                if (imageSizeKey) {
+                    const imageUrl = await this.getImageUrl(Key);
+                    if (imageName.endsWith('.png')) {
+                        imagesBySize[imageSizeKey].png = imageUrl;
+                    } else if (imageName.endsWith('.webp')) {
+                        imagesBySize[imageSizeKey].webp = imageUrl;
+                    }
+                }
             }
     
-            // Ensure the default key is properly assigned, prefer 'extralarge' or fallback
-            imagesBySize.default = imagesBySize['extralarge'] || defaultImageUrl;
+            // Convert the imagesBySize object into an array of objects as per your requirement
+            const imageSizeKeys = Object.keys(imagesBySize);
+            const imagesArray = imageSizeKeys.map(size => ({
+                size: size,
+                png: imagesBySize[size].png,
+                webp: imagesBySize[size].webp,
+            }));
     
-            return imagesBySize;
+            return imagesArray;
         } catch (error) {
             console.error("Error generating image URLs:", error);
             throw error;
         }
     }
+    
     
     
     
@@ -216,64 +222,65 @@ class S3Service {
             };
     
             const listedObjects = await this.s3.listObjectsV2(listParams).promise();
-            
-            // Temporary structure to group images by itemId and imageName
-            const imagesGroupedByItemAndName = {};
+    
+            // Structure to collect images with detailed size and format info
+            const imagesCollection = {};
     
             for (const { Key } of listedObjects.Contents) {
-                // Split the key to extract itemId, imageName, and image size
                 const keyParts = Key.split('/');
-                if (keyParts.length < 4) continue; // Ensure the key has the expected structure
-                
-                const itemId = keyParts[1];
-                const imageName = keyParts[2];
-                const fileName = keyParts[3];
-                const sizeKey = fileName.split('.')[0]; // Extract size from the filename
-                const sizeWord = sizeMap[sizeKey] || 'unknown'; // Map the numeric size to a descriptive word
-                
-                // Generate a signed URL for the image
-                const imageUrl = await this.getImageUrl(Key);
-                
-                // Initialize the structure for this item if it doesn't exist
-                if (!imagesGroupedByItemAndName[itemId]) {
-                    imagesGroupedByItemAndName[itemId] = {};
-                }
+                if (keyParts.length !== 5) continue; // Ensure key has the expected structure
     
-                // Initialize the structure for this image if it doesn't exist
-                if (!imagesGroupedByItemAndName[itemId][imageName]) {
-                    imagesGroupedByItemAndName[itemId][imageName] = {
+                const [_, itemId, imageName, imageSize, fileName] = keyParts;
+                const imageFormat = fileName.split('.').pop();
+                const sizeWord = sizeMap[imageSize];
+    
+                if (!sizeWord) continue; // Skip if the size does not match any known size
+    
+                const imageUrl = await this.getImageUrl(Key);
+    
+                // Create unique image identifier
+                const imageId = `${itemId}-${imageName}`;
+    
+                // Initialize image object if not already done
+                if (!imagesCollection[imageId]) {
+                    imagesCollection[imageId] = {
                         itemId,
                         imageName,
-                        imageUrls: {}, // Prepare to fill with size descriptors
+                        extrasmall: { png: null, webp: null },
+                        small: { png: null, webp: null },
+                        medium: { png: null, webp: null },
+                        large: { png: null, webp: null },
+                        extralarge: { png: null, webp: null },
                     };
                 }
-                
-                // Assign the URL to the size descriptor
-                imagesGroupedByItemAndName[itemId][imageName].imageUrls[sizeWord] = imageUrl;
     
-                // Set the 'default' key to point to the 'extrasmall' version (or '300' version explicitly)
-                imagesGroupedByItemAndName[itemId][imageName].imageUrls['default'] = imagesGroupedByItemAndName[itemId][imageName].imageUrls['extralarge'] || imageUrl;
+                // Assign the URL to the appropriate format and size
+                imagesCollection[imageId][sizeWord][imageFormat] = imageUrl;
             }
     
-            // Flatten the structure into an array of items with their images
-            const allImageURLs = [];
-            Object.keys(imagesGroupedByItemAndName).forEach(itemId => {
-                Object.values(imagesGroupedByItemAndName[itemId]).forEach(image => {
-                    allImageURLs.push({
-                        itemId: image.itemId,
-                        imageUrls: image.imageUrls,
-                    });
-                });
+            // Convert to array format expected by the caller
+            const allImages = Object.values(imagesCollection).map(image => {
+                return {
+                    itemId: image.itemId,
+                    imageName: image.imageName,
+                    sizes: {
+                        extrasmall: image.extrasmall,
+                        small: image.small,
+                        medium: image.medium,
+                        large: image.large,
+                        extralarge: image.extralarge,
+                    }
+                };
             });
     
-            // console.log('Retrieved all image URLs successfully.');
-            return allImageURLs;
+            return allImages;
         } catch (error) {
             console.error("Error retrieving all image URLs:", error);
             throw error;
-        } finally {
         }
     }
+    
+    
     
 
     

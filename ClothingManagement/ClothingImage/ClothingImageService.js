@@ -126,19 +126,40 @@ class ClothingImageService {
     async bulkInsertImages(imagesData) {
         try {
             // Ensure that all itemId values are correctly formatted as ObjectId instances
+            // and handle the inclusion of imageType
             const formattedImagesData = imagesData.map(data => ({
                 ...data,
                 itemId: new ObjectId(data.itemId),
+                // No need to convert imageType, assuming it's correctly provided as 0 or 1
             }));
-
+    
             const result = await this.collection.insertMany(formattedImagesData);
-          //  // console.log(`${result.insertedCount} images were inserted.`);
+            // console.log(`${result.insertedCount} images were inserted.`);
             return result;
         } catch (error) {
-         //   console.error("Error bulk inserting images:", error);
+            console.error("Error bulk inserting images:", error);
             throw error;
         }
     }
+
+    async getImagesForItemByType(itemId, imageType) {
+        try {
+            const itemObjectId = new ObjectId(itemId);
+            const images = await this.collection.find({ itemId: itemObjectId, imageType: imageType }).toArray();
+            if (images.length > 0) {
+                // console.log(`Fetched ${images.length} image(s) of type ${imageType} for item with ID: ${itemId}`);
+                return images;
+            } else {
+                // console.log(`No images of type ${imageType} found for item with ID: ${itemId}`);
+                return [];
+            }
+        } catch (error) {
+            console.error(`Error fetching images of type ${imageType} for item with ID: ${itemId}:`, error);
+            throw error;
+        }
+    }
+    
+    
 
 }
 
