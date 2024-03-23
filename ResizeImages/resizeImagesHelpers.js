@@ -35,25 +35,29 @@ async function saveWebpVersions(filePath) {
 
     // Read the image into a buffer
     const buffer = await fs.readFile(filePath);
+    const metadata = await sharp(buffer).metadata(); // Get image metadata for aspect ratio calculation
 
-    // Sizes to resize the images to
-    const sizes = [200, 300, 350, 400, 500];
+    // Sizes to resize the images to (as widths)
+    const sizes = [200, 300, 400];
 
     for (const size of sizes) {
       const sizeDir = path.join(outputDir, `${size}`);
       await fs.mkdir(sizeDir, { recursive: true });
 
+      // Calculate height while maintaining aspect ratio, rounded to the nearest whole number
+      const height = Math.round((metadata.height / metadata.width) * size);
+
       // Lossless compression with high quality (but larger file size)
       const losslessOutputPath = path.join(sizeDir, `${baseFileName}_lossless.webp`);
       await sharp(buffer)
-        .resize(size, size)
+        .resize(size, height) // Use calculated height
         .webp({ quality: 100, lossless: true })
         .toFile(losslessOutputPath);
 
       // High compression with low quality (but smaller file size)
       const compressedOutputPath = path.join(sizeDir, `${baseFileName}_compressed.webp`);
       await sharp(buffer)
-        .resize(size, size)
+        .resize(size, height) // Use calculated height
         .webp({ quality: 10 }) // 10 out of 100 for heavy compression
         .toFile(compressedOutputPath);
     }
@@ -61,12 +65,13 @@ async function saveWebpVersions(filePath) {
     // Delete the original file
     await fs.unlink(filePath);
 
-    ('WebP images saved for sizes:', sizes);
+    console.log('WebP images saved for sizes:', sizes);
   } catch (error) {
     console.error("Error saving WebP versions:", error);
     throw error;
   }
 }
+
 
 
 
@@ -224,8 +229,8 @@ async function categorizeImages(folderPath, categories = {
 
 async function createImageFromLayout(layout, outputPath) {
   // Determine the overall dimensions of the layout
-  const overallWidth = 1000;
-  const overallHeight = 1000;
+  const overallWidth = layout.width;
+  const overallHeight = layout.height;
 
   // Check if the output directory exists, if not create it
   const outputDir = path.dirname(outputPath);
