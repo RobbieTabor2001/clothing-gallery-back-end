@@ -2,8 +2,9 @@ const { MongoClient } = require("mongodb");
 require('dotenv').config();
 
 // Import the refactored services
-const ClothingItemsService = require('./ClothingItem/ClothingItemService.js');
+const ClothingItemsService = require('./ClothingItem/ClothingItemService');
 const ClothingImageService = require('./ClothingImage/ClothingImageService');
+const MultiClothingImageService = require('./MultiClothingImage/MultiClothingImageService');
 
 const uri = `mongodb+srv://${process.env.MONGO_ACCESS_USERID}:${process.env.MONGO_ACCESS_ACCESS_KEY}@${process.env.MONGO_CLUSTER_ADDRESS}/${process.env.MONGO_DATABASE_NAME}?retryWrites=true&w=majority&appName=${process.env.MONGO_DATABASE_NAME}`;
 
@@ -12,6 +13,7 @@ class ClothingManagementService {
         this.client = new MongoClient(uri);
         this.itemsService = new ClothingItemsService();
         this.imageService = new ClothingImageService();
+        this.multiImageService = new MultiClothingImageService();
     }
 
     async connect() {
@@ -20,8 +22,9 @@ class ClothingManagementService {
             await Promise.all([
                 this.itemsService.connect(),
                 this.imageService.connect(),
+                this.multiImageService.connect(),
             ]);
-            /// console.log("Connected to MongoDB for ClothingManagementService");
+            //console.log("Connected to MongoDB for ClothingManagementService");
         } catch (error) {
            // console.error("Failed to connect for ClothingManagementService", error);
             throw error;
@@ -34,8 +37,9 @@ class ClothingManagementService {
             await Promise.all([
                 this.itemsService.disconnect(),
                 this.imageService.disconnect(),
+                this.multiImageService.disconnect(),
             ]);
-           // // console.log("Disconnected from MongoDB for ClothingManagementService");
+           //console.log("Disconnected from MongoDB for ClothingManagementService");
         } catch (error) {
            // console.error("Failed to disconnect for ClothingManagementService", error);
             throw error;
@@ -60,7 +64,7 @@ class ClothingManagementService {
             });
     
             const imagesResult = await this.imageService.bulkInsertImages(imagesData); // This method now needs to handle the imageType field
-            // console.log(`${imagesResult.length} images were inserted for item with _id: ${itemResult.insertedId}`);
+            // (`${imagesResult.length} images were inserted for item with _id: ${itemResult.insertedId}`);
     
             return itemResult;
         } catch (error) {
@@ -75,7 +79,7 @@ class ClothingManagementService {
             // Retrieve the item by ID using ClothingItemsService
             const item = await this.itemsService.findItemById(itemId);
             if (!item) {
-                // console.log(`No item found with ID: ${itemId}`);
+                // (`No item found with ID: ${itemId}`);
                 return null;
             }
             // Retrieve all images for the item using ClothingImageService
@@ -89,7 +93,7 @@ class ClothingManagementService {
                 imageType: image.imageType // Assuming imageType is stored as 0 for Image, 1 for SquareImage
             }));
             
-            // console.log(`Item with images retrieved successfully for ID: ${itemId}`);
+            // (`Item with images retrieved successfully for ID: ${itemId}`);
             return item;
         } catch (error) {
             console.error(`Error retrieving item with images for ID: ${itemId}:`, error);
@@ -105,8 +109,10 @@ class ClothingManagementService {
             const itemResult = await this.itemsService.deleteItemById(itemId);
             // Delete all images associated with the item using ClothingImageService
             const imagesResult = await this.imageService.deleteImagesByItemId(itemId); // This assumes a method to delete images by itemId is implemented
-           // // console.log(`Item and its images deleted successfully for ID: ${itemId}`);
-            return { itemResult, imagesResult };
+
+            const multiImageResult = await this.multiImageService.deleteImagesByItemId(itemId);
+           // (`Item and its images deleted successfully for ID: ${itemId}`);
+            return { itemResult, imagesResult, multiImageResult };
         } catch (error) {
          //   console.error(`Error deleting item and its images for ID: ${itemId}:`, error);
             throw error;
@@ -117,24 +123,47 @@ class ClothingManagementService {
 
     async getAllImages() {
         try {
-            
-            // Use ClothingImageService to get all images
+            // Connect to both Image and MultiImage services if not already connected
+            await Promise.all([
+                this.imageService.connect(),
+                this.multiImageService.connect(),
+            ]);
+
+            // Use ClothingImageService to get all individual images
             const imageDocs = await this.imageService.findAllImages();
             const images = imageDocs.map(doc => ({
                 id: doc._id,
                 itemId: doc.itemId,
-                imagePath: doc.imagePath
+                imagePath: doc.imagePath,
+                imageType: doc.imageType // Assuming individual images also have an imageType
             }));
-           // // console.log(`Retrieved all images successfully.`);
-            return images;
+
+            // Use MultiClothingImageService to get all multi images
+            const multiImageDocs = await this.multiImageService.getAllMultiImages();
+            const multiImages = multiImageDocs.map(doc => ({
+                id: doc._id,
+                itemIds: doc.itemIds, // Note the plural to differentiate from individual images
+                imagePath: doc.imagePath,
+                imageType: doc.imageType // Assuming multi images also have an imageType
+            }));
+
+            // Optionally disconnect from both services
+            await Promise.all([
+                this.imageService.disconnect(),
+                this.multiImageService.disconnect(),
+            ]);
+
+            // Combine and return the results in an object
+            return {
+                images, // Collection of individual images
+                multiImages // Collection of multi-images
+            };
         } catch (error) {
-         //   console.error(`Error retrieving all images:`, error);
+            console.error(`Error retrieving all images and multi images:`, error);
             throw error;
-        } finally {
-            
         }
     }
-
+/*
     async insertImagesForItem(itemId, imageDetails) {
         try {
             // Ensure itemId is correctly formatted as an ObjectId
@@ -149,7 +178,7 @@ class ClothingManagementService {
     
             // Use ClothingImageService to insert images into MongoDB
             const imagesResult = await this.imageService.bulkInsertImages(imagesData);
-            /// console.log(`${imagesResult.insertedCount} images were inserted for item with _id: ${itemId}`);
+            /// (`${imagesResult.insertedCount} images were inserted for item with _id: ${itemId}`);
     
             return imagesResult;
         } catch (error) {
@@ -157,6 +186,7 @@ class ClothingManagementService {
             throw error;
         }
     }
+    */
     
     async insertImageDetails(itemId, imageDetails) {
         try {
@@ -172,7 +202,7 @@ class ClothingManagementService {
     
             // Use ClothingImageService to insert images into MongoDB
             const imagesResult = await this.imageService.bulkInsertImages(imagesData);
-            // console.log(`${imagesResult.insertedCount} images were inserted for item with _id: ${itemId}`);
+            // (`${imagesResult.insertedCount} images were inserted for item with _id: ${itemId}`);
     
             return imagesResult;
         } catch (error) {
@@ -185,7 +215,7 @@ class ClothingManagementService {
         try {
             // Insert item using ClothingItemsService
             const itemResult = await this.itemsService.insertOneItem(itemData);
-           // // console.log(`A document for item was inserted with the _id: ${itemResult}`);
+           // (`A document for item was inserted with the _id: ${itemResult}`);
             return itemResult
         } catch (error) {
           //  console.error("Error inserting item with images:", error);
@@ -195,13 +225,12 @@ class ClothingManagementService {
 
     async getItemWithImagesByType(itemId, imageType) {
         try {
-            // Connect to the database if not already connected
-            await this.connect();
+
     
             // Retrieve the item by ID using ClothingItemsService
             const item = await this.itemsService.findItemById(itemId);
             if (!item) {
-                // console.log(`No item found with ID: ${itemId}`);
+                // (`No item found with ID: ${itemId}`);
                 return null;
             }
     
@@ -218,9 +247,8 @@ class ClothingManagementService {
             }));
     
             // Optionally disconnect from the database
-            await this.disconnect();
     
-            // console.log(`Item with images of type ${imageType} retrieved successfully for ID: ${itemId}`);
+            // (`Item with images of type ${imageType} retrieved successfully for ID: ${itemId}`);
             return item;
         } catch (error) {
             console.error(`Error retrieving item with images of type ${imageType} for ID: ${itemId}:`, error);
@@ -228,6 +256,19 @@ class ClothingManagementService {
         }
     }
     
+    async insertMultiImage(itemIds, imagePath, imageType) {
+        try {
+            // Ensure itemIds are formatted as ObjectId instances
+            const formattedItemIds = itemIds;
+            // Call the method from MultiClothingImageService to insert the multi-image document
+            const result = await this.multiImageService.insertOneMultiImage(formattedItemIds, imagePath, imageType);
+            //console.log("Inserted one multi-image document:", result);
+            return result;
+        } catch (error) {
+            console.error("Error inserting multi-image document:", error);
+            throw error;
+        }
+    }
 }
 
 module.exports = ClothingManagementService;

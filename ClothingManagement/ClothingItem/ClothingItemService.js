@@ -15,7 +15,7 @@ class ClothingItemsService {
     async connect() {
         try {
             await this.client.connect();
-            // console.log("Connected to MongoDB");
+            //console.log("Connected to MongoDB");
             this.db = this.client.db(process.env.MONGO_DATABASE_NAME);
             this.collection = this.db.collection("clothingItem");
         } catch (error) {
@@ -27,7 +27,7 @@ class ClothingItemsService {
     async disconnect() {
         try {
             await this.client.close();
-            // console.log("Disconnected from MongoDB");
+            //console.log("Disconnected from MongoDB");
         } catch (error) {
             console.error("Failed to disconnect from MongoDB", error);
             throw error;
@@ -37,7 +37,7 @@ class ClothingItemsService {
     async insertOneItem(item) {
         try {
             const result = await this.collection.insertOne(item);
-            // console.log(`A document was inserted with the _id: ${result.insertedId}`);
+            // (`A document was inserted with the _id: ${result.insertedId}`);
             return result.insertedId.toString(); // Convert ObjectId to string and return it
         } catch (error) {
             console.error("Error inserting item:", error);
@@ -47,29 +47,29 @@ class ClothingItemsService {
 
 
     async updateItemById(id, updateDoc) {
-        const result = await this.collection.updateOne({ _id: new ObjectId(id) }, { $set: updateDoc });
-        // console.log(`${result.matchedCount} document(s) matched the query. Updated ${result.modifiedCount} document(s).`);
+        const result = await this.collection.updateOne({ _id: id }, { $set: updateDoc });
+        // (`${result.matchedCount} document(s) matched the query. Updated ${result.modifiedCount} document(s).`);
     }
 
     async findAllItems() {
         const items = await this.collection.find({}).toArray();
-        // console.log(items);
+        // (items);
         return items;
     }
 
     async findItemById(id) {
-        const item = await this.collection.findOne({ _id: new ObjectId(id) });
-        // console.log(item);
+        const item = await this.collection.findOne({ _id: id });
+        // (item);
         return item;
     }
 
     async deleteItemById(id) {
         try {
-            const result = await this.collection.deleteOne({ _id: new ObjectId(id) });
+            const result = await this.collection.deleteOne({ _id: id });
             if (result.deletedCount === 1) {
-                // console.log(`Successfully deleted one document with _id: ${id}.`);
+                // (`Successfully deleted one document with _id: ${id}.`);
             } else {
-                // console.log(`No documents matched the query. Deleted 0 documents with _id: ${id}.`);
+                // (`No documents matched the query. Deleted 0 documents with _id: ${id}.`);
             }
             return result;
         } catch (error) {

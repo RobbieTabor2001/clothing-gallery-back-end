@@ -1,5 +1,7 @@
 .env
 node_modules/
 Images/
+OutputImages/
+AllImages/
 CSVs/
-OutputImageLeftOver/
+OutputMultiImages/

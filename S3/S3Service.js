@@ -18,7 +18,7 @@ class S3Service {
         try {
             // This example assumes you want to download the image. If you just want to get the URL, adjust accordingly.
             const data = await this.s3.getObject(params).promise();
-            // console.log(`Image fetched successfully.`);
+            // (`Image fetched successfully.`);
             return data.Body;
         } catch (error) {
             console.error("Error fetching image:", error);
@@ -35,7 +35,7 @@ class S3Service {
         try {
             // Generate a signed URL for temporary access
             const url = await this.s3.getSignedUrlPromise('getObject', params);
-            // console.log(`Image URL generated successfully.`);
+            // (`Image URL generated successfully.`);
             return url;
         } catch (error) {
             console.error("Error generating image URL:", error);
@@ -100,7 +100,7 @@ class S3Service {
             await this.s3.deleteObjects(deleteParams).promise();
 
             if (listedObjects.IsTruncated) await this.deleteFolder(s3FolderName); // Recurse to delete more if the list is truncated
-            // console.log(`${s3FolderName} deleted successfully.`);
+            // (`${s3FolderName} deleted successfully.`);
         } catch (error) {
             console.error("Error deleting folder:", error);
             throw error;
@@ -117,7 +117,7 @@ class S3Service {
         try {
             const data = await this.s3.listObjectsV2(params).promise();
             const images = data.Contents.map(item => item.Key);
-            // console.log(`Images in ${s3FolderName}:`, images);
+            // (`Images in ${s3FolderName}:`, images);
             return images;
         } catch (error) {
             console.error("Error reading folder:", error);
@@ -140,58 +140,59 @@ class S3Service {
         };
     
         try {
+            (s3FolderPath);
             const listedObjects = await this.s3.listObjectsV2(listParams).promise();
             if (listedObjects.Contents.length === 0) {
-                return []; // Return an empty array if no images are found
+                return {}; // Return an empty object if no images are found
             }
     
-            // Initialize an object to hold image URLs organized by size, each with png and webp fields
-            let imagesBySize = {
-                extrasmall: { png: null, webp: null },
-                small: { png: null, webp: null },
-                medium: { png: null, webp: null },
-                large: { png: null, webp: null },
-                extralarge: { png: null, webp: null },
+            // Initialize an object to hold image URLs organized by size
+            let imagesDetails = {
+                imageName: '',
+                small: { compressed: null, lossless: null },
+                medium: { compressed: null, lossless: null },
+                large: { compressed: null, lossless: null },
             };
     
-            const twoDimensionalSizeMap = {
-                '233x233': 'extrasmall',
-                '308x308': 'small',
-                '406x406': 'medium',
-                '532x532': 'large',
-                '700x700': 'extralarge',
+            // Update twoDimensionalSizeMap to match the expected size directory names
+            const sizeMap = {
+                '200': 'small',
+                '300': 'medium',
+                '400': 'large',
             };
     
             for (let { Key } of listedObjects.Contents) {
                 const keyParts = Key.split('/');
-                const imageSize = keyParts[keyParts.length - 2];
-                const imageName = keyParts[keyParts.length - 1];
-                const imageSizeKey = twoDimensionalSizeMap[imageSize];
+                // Extract image name, size, and format
+
+                const imageSizeKey = sizeMap[keyParts[keyParts.length - 2]];
+                const imageName = keyParts[[keyParts.length-1]] // Assuming the format IMG_NAME_size_format.webp
+                const isLossless = imageName.endsWith('lossless.webp');
+                const isCompressed = imageName.endsWith('compressed.webp');
+
+
+                if (imagesDetails.imageName === '') {
+                    imagesDetails.imageName = imageName.split('_')[0]; // Set the image name if not already set
+                }
     
                 if (imageSizeKey) {
                     const imageUrl = await this.getImageUrl(Key);
-                    if (imageName.endsWith('.png')) {
-                        imagesBySize[imageSizeKey].png = imageUrl;
-                    } else if (imageName.endsWith('.webp')) {
-                        imagesBySize[imageSizeKey].webp = imageUrl;
+
+                    if (isLossless) {
+                        imagesDetails[imageSizeKey].lossless = imageUrl;
+                    } else if (isCompressed) {
+                        imagesDetails[imageSizeKey].compressed = imageUrl;
                     }
                 }
             }
     
-            // Convert the imagesBySize object into an array of objects as per your requirement
-            const imageSizeKeys = Object.keys(imagesBySize);
-            const imagesArray = imageSizeKeys.map(size => ({
-                size: size,
-                png: imagesBySize[size].png,
-                webp: imagesBySize[size].webp,
-            }));
-    
-            return imagesArray;
+            return imagesDetails;
         } catch (error) {
             console.error("Error generating image URLs:", error);
             throw error;
         }
     }
+    
     
     
     
@@ -210,15 +211,13 @@ class S3Service {
         try {
             const listParams = {
                 Bucket: this.bucketName,
-                Prefix: 'images/', // List all objects under the 'images/' folder
+                Prefix: 'squareimages/', // List all objects under the 'images/' folder
             };
     
             const sizeMap = {
-                '100': 'extrasmall',
-                '132': 'small',
-                '174': 'medium',
-                '228': 'large',
-                '300': 'extralarge',
+                '200': 'small',
+                '300': 'medium',
+                '400': 'large',
             };
     
             const listedObjects = await this.s3.listObjectsV2(listParams).promise();
@@ -231,12 +230,21 @@ class S3Service {
                 if (keyParts.length !== 5) continue; // Ensure key has the expected structure
     
                 const [_, itemId, imageName, imageSize, fileName] = keyParts;
-                const imageFormat = fileName.split('.').pop();
                 const sizeWord = sizeMap[imageSize];
     
                 if (!sizeWord) continue; // Skip if the size does not match any known size
     
                 const imageUrl = await this.getImageUrl(Key);
+    
+                // Determine if the image is lossless or compressed from the file name
+                let imageQuality;
+                if (fileName.includes('lossless')) {
+                    imageQuality = 'lossless';
+                } else if (fileName.includes('compressed')) {
+                    imageQuality = 'compressed';
+                } else {
+                    continue; // Skip if the file name doesn't include quality information
+                }
     
                 // Create unique image identifier
                 const imageId = `${itemId}-${imageName}`;
@@ -246,16 +254,14 @@ class S3Service {
                     imagesCollection[imageId] = {
                         itemId,
                         imageName,
-                        extrasmall: { png: null, webp: null },
-                        small: { png: null, webp: null },
-                        medium: { png: null, webp: null },
-                        large: { png: null, webp: null },
-                        extralarge: { png: null, webp: null },
+                        small: { lossless: null, compressed: null },
+                        medium: { lossless: null, compressed: null },
+                        large: { lossless: null, compressed: null },
                     };
                 }
     
-                // Assign the URL to the appropriate format and size
-                imagesCollection[imageId][sizeWord][imageFormat] = imageUrl;
+                // Assign the URL to the appropriate quality and size
+                imagesCollection[imageId][sizeWord][imageQuality] = imageUrl;
             }
     
             // Convert to array format expected by the caller
@@ -264,11 +270,9 @@ class S3Service {
                     itemId: image.itemId,
                     imageName: image.imageName,
                     sizes: {
-                        extrasmall: image.extrasmall,
                         small: image.small,
                         medium: image.medium,
                         large: image.large,
-                        extralarge: image.extralarge,
                     }
                 };
             });
@@ -279,6 +283,7 @@ class S3Service {
             throw error;
         }
     }
+    
     
     
     

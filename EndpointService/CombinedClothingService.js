@@ -2,7 +2,6 @@ const AWS = require('aws-sdk');
 const fs = require('fs');
 const path = require('path');
 
-
 const S3Service = require('../S3/S3Service');
 const ClothingManagementService = require('../ClothingManagement/ClothingManagementService');
 
@@ -33,10 +32,10 @@ class CombinedClothingService {
             // Use ClothingManagementService to get the item with its MongoDB document images
             const item = await this.clothingManagementService.getItemWithImagesByType(itemId,1); //1 is square images
             if (!item) {
-                // console.log(`No item found with ID: ${itemId}`);
+                // (`No item found with ID: ${itemId}`);
                 return null;
             }
-            // console.log(item);
+            // (item);
             // For each image associated with the item, use getSingleImageVersions to get the dictionary of versions
             const imageVersionsPromises = item.squareImages.map(async (image) => {
                 // The imagePath directly becomes the s3FolderPath parameter for getSingleImageVersions
@@ -55,7 +54,7 @@ class CombinedClothingService {
                 images: imagesVersions // Storing structured image URLs
             };
     
-            // console.log(`Item with image URLs retrieved successfully for ID: ${itemId}`);
+            // (`Item with image URLs retrieved successfully for ID: ${itemId}`);
             return itemWithImageUrls;
         } catch (error) {
             console.error(`Error retrieving item with image URLs for ID: ${itemId}:`, error);
@@ -68,52 +67,64 @@ class CombinedClothingService {
 
     async addNewItemWithImages(localFolderPath, itemData) {
         try {
-            await this.connect();
-            // Insert the item and get the inserted item's ID as a string
-            // console.log("ada");
-            const itemIdString = await this.clothingManagementService.insertItemOnly(itemData);
+            const itemResult = await this.clothingManagementService.insertItemOnly(itemData);
+            const itemIdString = itemResult;
     
-            // Define the specific subdirectories for handling and their corresponding image type values
             const specificFolders = {
                 'SquareImages': 1,
                 'Images': 0
             };
     
-            const uniqueImagePaths = new Set();
             const imageDetails = []; // To hold the details including type for MongoDB insertion
-    
-            // Iterate through the specified folders, uploading their contents to the correct S3 path
+
+
             for (const [specificFolder, imageType] of Object.entries(specificFolders)) {
                 const specificFolderPath = path.join(localFolderPath, specificFolder);
-                // Check if the specific folder exists
+
                 if (fs.existsSync(specificFolderPath)) {
                     await this.uploadFolderAndSubfoldersToS3(specificFolderPath, `${specificFolder.toLowerCase()}/${itemIdString}`, '');
-    
-                    // For each directory, get image directories and construct the S3 path for each image
+  
                     const imageDirs = fs.readdirSync(specificFolderPath, { withFileTypes: true })
                                     .filter(dirent => dirent.isDirectory())
                                     .map(dirent => dirent.name);
-                                    
+    
                     for (const dirName of imageDirs) {
-                        // Construct the full path for each image and add it to the set
+
                         const imagePath = `${specificFolder.toLowerCase()}/${itemIdString}/${dirName}`;
-                        // Add imagePath and imageType to a structured object for MongoDB insertion
                         imageDetails.push({ imagePath, imageType });
                     }
                 }
             }
-    
-            // Insert the image details into MongoDB - adjust this according to your actual MongoDB schema/method
+
+
             await this.clothingManagementService.insertImageDetails(itemIdString, imageDetails);
     
-            return itemIdString; // Return the ID of the newly added item
+            // Use local folder name as itemName for return
+            const localFolderName = path.basename(localFolderPath);
+            return { itemIdString, localFolderName }; // Now returns an object with both values
         } catch (error) {
             console.error("Error adding new item with images:", error);
             throw error;
         } finally {
-            await this.disconnect();
         }
     }
+    
+    async addNewItemsWithImagesBulk(itemsData) {
+        try {
+            const results = [];
+            for (const { localFolderPath, itemData } of itemsData) {
+                //console.log("starting another");
+                const { itemIdString, localFolderName } = await this.addNewItemWithImages(localFolderPath, itemData);
+                results.push({ itemIdString, localFolderName });
+            }
+    
+            return results; // Returns an array of objects with itemIdString and localFolderName for each item
+        } catch (error) {
+            console.error("Error in bulk adding new items with images:", error);
+            throw error;
+        }
+    }
+    
     
     
     
@@ -125,14 +136,14 @@ class CombinedClothingService {
         let uploadPromises = [];
         for (let entry of entries) {
             const entryPath = path.join(subPath, entry.name);
-            // console.log(entry.name)
+            // (entry.name)
             if (entry.isDirectory()) {
                 const morePromises = await this.uploadFolderAndSubfoldersToS3(localFolderPath, s3FolderName, entryPath);
                 uploadPromises = uploadPromises.concat(morePromises);
             } else {
                 const localFile = path.join(fullPath, entry.name);
                 const s3Key = `${s3FolderName}/${entryPath}`;
-                // console.log(s3Key);
+                // (s3Key);
                 const promise = this.s3Service.uploadFileToS3(localFile, s3Key).then(() => s3Key);
                 uploadPromises.push(promise);
             }
@@ -145,13 +156,86 @@ class CombinedClothingService {
     async getAllImageURLs() {
         try {
             await this.connect();
-            // Delegate the call to S3Service to retrieve all image URLs
-            const allImageURLs = await this.s3Service.getAllImageURLs('images');
-            // Process or format the data further if needed
-            // For now, it just returns the data as-is
-            return allImageURLs;
+            // Retrieve all single image URLs
+            const allSingleImageURLs = await this.s3Service.getAllImageURLs('squareimages');
+            // Retrieve all multi image URLs
+            const allMultiImageUrls = await this.getAllMultiImageUrls();
+            // Return both collections
+            return { allSingleImageURLs, allMultiImageUrls };
         } catch (error) {
             console.error("Error retrieving all image URLs:", error);
+            throw error;
+        } finally {
+            await this.disconnect();
+        }
+    }
+    
+    
+
+    async insertMultiImages(layouts) {
+        try {
+            for (const layout of layouts) {
+                // Remove the .png extension if it exists in the layoutImagePath
+                const parsedPath = path.parse(layout.layoutImagePath);
+                const directoryNameWithoutExtension = path.join(parsedPath.dir, parsedPath.name);
+                
+                // Log the corrected path
+                // (directoryNameWithoutExtension);
+
+                // Construct the S3 folder name to upload the files
+                const s3FolderName = `MultiImages/${parsedPath.name}`;
+
+                // Upload all files from the directory to S3
+                const s3Keys = await this.uploadFolderAndSubfoldersToS3(directoryNameWithoutExtension, s3FolderName, '');
+                (s3Keys);
+                // Insert multiple image records into MongoDB for all files uploaded
+                if (s3Keys.length > 0) {
+                    // Extract the base S3 folder path from one of the S3 keys
+                    // All s3Keys will have a similar structure so taking the first one is sufficient
+                    const baseS3FolderPath = s3Keys[0].split('/').slice(0, 2).join('/'); // This will extract something like 'MultiImages/square_with43Portrait_0'
+    
+                    // Insert a single image record into MongoDB
+                    const multiImageRecord = {
+                        itemIds: layout.itemIds,
+                        imagePath: baseS3FolderPath,
+                        imageType: 1 // Assuming imageType is determined by some logic or is provided; placeholder here
+                    };
+                    (multiImageRecord);
+                    await this.clothingManagementService.insertMultiImage(
+                        multiImageRecord.itemIds,
+                        multiImageRecord.imagePath,
+                        multiImageRecord.imageType
+                    );
+                }
+            }
+        } catch (error) {
+            console.error("Error inserting multi images:", error);
+            throw error;
+        } finally {
+        }
+    }
+    
+    async getAllMultiImageUrls() {
+        try {
+            await this.connect();
+            // Get all multi images from MongoDB
+            const multiImages = await this.clothingManagementService.multiImageService.getAllMultiImages();
+    
+            // Iterate through each multi image to fetch URLs
+            const multiImageUrls = await Promise.all(multiImages.map(async (multiImage) => {
+                // Assume getSingleImageVersions method exists and returns the structured data as described
+                const imageDetails = await this.s3Service.getSingleImageVersions(multiImage.imagePath);
+    
+                // Construct and return the final structured data for each multi image
+                return {
+                    itemIds: multiImage.itemIds.map(id => id.toString()), // Ensuring itemIds are strings
+                    ...imageDetails // Spread the details obtained from S3Service
+                };
+            }));
+    
+            return multiImageUrls;
+        } catch (error) {
+            console.error("Error getting all multi image URLs:", error);
             throw error;
         } finally {
             await this.disconnect();

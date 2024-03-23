@@ -45,7 +45,7 @@ fs.readFile(inputFilePath, (err, fileData) => {
 
         // Write the output CSV
         csvWriter.writeRecords(outputData)
-            .then(() => // console.log('Output CSV file has been written successfully.'))
+            .then(() => // ('Output CSV file has been written successfully.'))
             .catch(err => console.error('Error writing output CSV:', err));
     });
 });
