@@ -5,7 +5,6 @@ const path = require('path');
 const {
   determineSingleLayout,
   createMultiLayoutImagesWithItemIds,
-  categorizeImage,
   categorizeImages,
   createImageFromLayout
 } = require('./resizeImagesHelpers');

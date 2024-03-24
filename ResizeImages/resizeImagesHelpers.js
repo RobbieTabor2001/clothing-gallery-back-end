@@ -20,7 +20,8 @@ const {
   createtwoSquareImagesOne169PortaitImageReverse,
   createtwoSquareImagesOne169LandscapeImageReverse,
   createtwoSquareImagesOne43PortaitImageReverse,
-  createtwoSquareImagesOne43LandscapeImageReverse
+  createtwoSquareImagesOne43LandscapeImageReverse,
+  createfourSquareImagesInCorners
 } = require('./imageLayouts');
 
 async function saveWebpVersions(filePath) {
@@ -72,131 +73,132 @@ async function saveWebpVersions(filePath) {
   }
 }
 
-
-
-
-async function determineSingleLayout(imagePath) {
-  const metadata = await sharp(imagePath).metadata();
-  const aspectRatio = metadata.width / metadata.height;
-  if (aspectRatio === 1) return createSingleSquareImageLayout(imagePath);
-  else if (aspectRatio > 1) {
-    // Landscape orientation
-    if (aspectRatio >= 16 / 9) return createSingle169LandscapeImageCenteredLayout(imagePath);
-    else return createSingle43LandscapeImageCenteredLayout(imagePath);
-  } else {
-    // Portrait orientation
-    if (aspectRatio <= 9 / 16) return createSingle169PortraitImageCenteredLayout(imagePath);
-    else return createSingle43PortraitImageCenteredLayout(imagePath);
-  }
-}
-
-async function createMultiLayoutImagesWithItemIds(categories, outputFolderPath,itemFolderMappings ) {
-  const layoutResults = [];
-  // Helper function to select random images from a category
-  const selectRandomImages = (imageArray, count) => {
-    const shuffled = imageArray.sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
-  };
-
-  // Generate layouts based on available images, scaling the layouts up or down
-  for (const [category, images] of Object.entries(categories)) {
-    if (images.length < 2) continue; // Skip categories with less than 2 images for multi-image layouts
-
-    const totalLayouts = Math.min(Math.floor(images.length / 2), 5); // Limit to 5 layouts of each type for example
-
-    for (let i = 0; i < totalLayouts; i++) {
-      let layout, layoutName;
-      switch (category) {
-        case 'landscape169':
-          if (images.length >= 3) {
-            layout = createThree169ImagesEvenlySpacedRowsLayout(selectRandomImages(images, 3));
-            layoutName = `landscape169_threeRows_${i}.png`;
-          } else {
-            layout = createTwo169ImagesEvenlySpacedRowsLayout(selectRandomImages(images, 2));
-            layoutName = `landscape169_twoRows_${i}.png`;
-          }
-          break;
-        case 'portrait169':
-          if (images.length >= 3) {
-            layout = createThree169ImagesEvenlySpacedColumnsLayout(selectRandomImages(images, 3));
-            layoutName = `portrait169_threeColumns_${i}.png`;
-          } else {
-            layout = createTwo169ImagesEvenlySpacedColumnsLayout(selectRandomImages(images, 2));
-            layoutName = `portrait169_twoColumns_${i}.png`;
-          }
-          break;
-        case 'square':
-          // Given that square images can fit with other categories too, choose layouts dynamically
-          if (categories.portrait43 && categories.portrait43.length > 0) {
-            layout = createtwoSquareImagesOne43PortaitImage(selectRandomImages([...images, ...categories.portrait43], 3));
-            layoutName = `square_with43Portrait_${i}.png`;
-          } else if (categories.landscape169 && categories.landscape169.length > 0) {
-            layout = createtwoSquareImagesOne169LandscapeImage(selectRandomImages([...images, ...categories.landscape169], 3));
-            layoutName = `square_with169Landscape_${i}.png`;
-          }
-          break;
-        // Assuming categories for portrait43 and landscape43 exist and are filled similarly to portrait169 and landscape169
-        case 'portrait43':
-          if (images.length >= 2 && categories.square && categories.square.length > 0) {
-            layout = createtwoSquareImagesOne43PortaitImage(selectRandomImages([...images, ...categories.square], 3));
-            layoutName = `portrait43_withTwoSquares_${i}.png`;
-          }
-          break;
-        case 'landscape43':
-          if (images.length >= 2 && categories.square && categories.square.length > 0) {
-            layout = createtwoSquareImagesOne43LandscapeImage(selectRandomImages([...images, ...categories.square], 3));
-            layoutName = `landscape43_withTwoSquares_${i}.png`;
-          }
-          break;
-        // Default case for unexpected categories - can log or handle as needed
-        default:
-          // (`No layout rule defined for category: ${category}`);
-          break;
-      }
-
-      if (layout && layoutName) {
-        const outputPath = path.join(outputFolderPath, layoutName);
-        await createImageFromLayout(layout, outputPath);
-        
-        // Use the getItemIdsForLayout to determine the item IDs involved in the current layout
-        const itemIds = getItemIdsForLayout(itemFolderMappings, layout);
-
-        // Add to the layout results including item IDs and the local file path
-        layoutResults.push({
-          itemIds: itemIds,
-          layoutImagePath: outputPath
-        });
-      }
+function getAllMultiLayouts() {
+  const layouts = [
+    {
+      function: createThree169ImagesEvenlySpacedRowsLayout,
+      requirements: ['16:9', '16:9', '16:9']
+    },
+    {
+      function: createTwo169ImagesEvenlySpacedRowsLayout,
+      requirements: ['16:9', '16:9']
+    },
+    {
+      function: createThree169ImagesEvenlySpacedColumnsLayout,
+      requirements: ['9:16', '9:16', '9:16']
+    },
+    {
+      function: createTwo169ImagesEvenlySpacedColumnsLayout,
+      requirements: ['9:16', '9:16']
+    },
+    {
+      function: createtwoSquareImagesOne43PortaitImage,
+      requirements: ['1:1', '1:1', '3:4']
+    },
+    {
+      function: createtwoSquareImagesOne43LandscapeImage,
+      requirements: ['1:1', '1:1', '4:3']
+    },
+    {
+      function: createtwoSquareImagesOne169PortaitImage,
+      requirements: ['1:1', '1:1', '9:16']
+    },
+    {
+      function: createtwoSquareImagesOne169LandscapeImage,
+      requirements: ['1:1', '1:1', '16:9']
+    },
+    {
+      function: createtwoSquareImagesOne169PortaitImageReverse,
+      requirements: ['1:1', '1:1', '9:16']
+    },
+    {
+      function: createtwoSquareImagesOne169LandscapeImageReverse,
+      requirements: ['1:1', '1:1', '16:9']
+    },
+    {
+      function: createtwoSquareImagesOne43PortaitImageReverse,
+      requirements: ['1:1', '1:1', '3:4']
+    },
+    {
+      function: createtwoSquareImagesOne43LandscapeImageReverse,
+      requirements: ['1:1', '1:1', '4:3']
+    },
+    {
+      function: createfourSquareImagesInCorners,
+      requirements: ['1:1', '1:1', '1:1', '1:1']
     }
-  }
-  
+  ];
 
-  return layoutResults;
+  return layouts;
 }
+
 
 async function categorizeImage(filePath, categories) {
   const metadata = await sharp(filePath).metadata();
   const aspectRatio = metadata.width / metadata.height;
+  const aspectRatioLabel = aspectRatio === 1 ? '1:1' : 
+                           aspectRatio > 1 ? (aspectRatio >= 16 / 9 ? '16:9' : '4:3') : 
+                           (aspectRatio <= 9 / 16 ? '9:16' : '3:4');
+
+  const imageInfo = { path: filePath, aspectRatio: aspectRatioLabel };
 
   if (aspectRatio === 1) {
-    categories.square.push(filePath);
+    categories.square.push(imageInfo);
   } else if (aspectRatio > 1) {
     // Landscape
     if (aspectRatio >= 16 / 9) {
-      categories.landscape169.push(filePath);
+      categories.landscape169.push(imageInfo);
     } else {
-      categories.landscape43.push(filePath);
+      categories.landscape43.push(imageInfo);
     }
   } else {
     // Portrait
     if (aspectRatio <= 9 / 16) {
-      categories.portrait169.push(filePath);
+      categories.portrait169.push(imageInfo);
     } else {
-      categories.portrait43.push(filePath);
+      categories.portrait43.push(imageInfo);
     }
   }
 }
 
+
+function getItemIdsForLayout(itemFolderMappings, layout) {
+  // Extract image paths from the layout
+  const layoutImagePaths = layout.images.map(image => image.imagePath);
+
+  // Create a set to hold unique item IDs
+  const itemIds = new Set();
+
+  // Iterate through each image path in the layout
+  layoutImagePaths.forEach(layoutImagePath => {
+      // Extract the folder name from the image path
+      const imageFolderName = extractFolderNameFromImagePath(layoutImagePath);
+
+      // Find the corresponding itemIdString for the folder name
+      itemFolderMappings.forEach(({ itemIdString, localFolderName }) => {
+          if (localFolderName === imageFolderName) {
+              // If a match is found, add the itemIdString to the set
+              itemIds.add(itemIdString);
+          }
+      });
+  });
+
+  // Convert the set of item IDs to an array and return
+  return [...itemIds];
+}
+
+function extractFolderNameFromImagePath(imagePath) {
+  // Assuming imagePath format is like 'specificFolder/itemIdString/dirName'
+  // And that 'dirName' correlates to 'localFolderName'
+  const parts = imagePath.split('/');
+  // Adjust the index as necessary depending on the exact format of your paths
+  return parts[parts.length - 2];
+}
+
+
+
+
+//main funcs
 async function categorizeImages(folderPath, categories = {
   square: [],
   portrait43: [],
@@ -224,8 +226,6 @@ async function categorizeImages(folderPath, categories = {
 
   return categories;
 }
-
-
 
 async function createImageFromLayout(layout, outputPath) {
   // Determine the overall dimensions of the layout
@@ -274,38 +274,85 @@ async function createImageFromLayout(layout, outputPath) {
   await saveWebpVersions(outputPath);
 }
 
-function getItemIdsForLayout(itemFolderMappings, layout) {
-  // Extract image paths from the layout
-  const layoutImagePaths = layout.images.map(image => image.imagePath);
+async function createMultiLayoutImagesWithItemIds(categories, outputFolderPath, itemFolderMappings) {
+  const layoutResults = [];
+  const allMultiLayouts = getAllMultiLayouts(); // Get all layout definitions including requirements
+  const imagesCreated = 100; // The total number of multi-images you aim to create
+  
+  // Helper function to select random images from any category that matches the required aspect ratio
+  const selectRandomImagesByAspectRatio = (aspectRatio, count) => {
+    let allMatchingImages = [];
+    // Aggregate all images that match the required aspect ratio
+    for (const [category, images] of Object.entries(categories)) {
+      const matchingImages = images.filter(image => image.aspectRatio === aspectRatio);
+      allMatchingImages = [...allMatchingImages, ...matchingImages];
+    }
+    // Shuffle and slice to get the desired count
+    return allMatchingImages.sort(() => 0.5 - Math.random()).slice(0, count);
+  };
 
-  // Create a set to hold unique item IDs
-  const itemIds = new Set();
+  for (let i = 0; i < imagesCreated; i++) {
+    // Randomly select a layout function
+    const layoutIndex = Math.floor(Math.random() * allMultiLayouts.length);
+    const {function: layoutFunc, requirements} = allMultiLayouts[layoutIndex];
+    
+    let selectedImages = [];
+    let canFulfillRequirements = true;
+    
+    // Iterate through each requirement to collect images
+    for (const aspectRatio of requirements) {
+      const images = selectRandomImagesByAspectRatio(aspectRatio, 1);
+      if (images.length < 1) {
+        canFulfillRequirements = false;
+        break;
+      }
+      selectedImages = [...selectedImages, ...images];
+    }
+    
+    if (!canFulfillRequirements) continue; // Skip if cannot fulfill the layout requirements
 
-  // Iterate through each image path in the layout
-  layoutImagePaths.forEach(layoutImagePath => {
-      // Extract the folder name from the image path
-      const imageFolderName = extractFolderNameFromImagePath(layoutImagePath);
+    // Assuming your layout function expects paths, map selected images to their paths
+    const imagePaths = selectedImages.map(image => image.path);
+    
+    // Generate the layout
+    const layout = layoutFunc(imagePaths);
+    const layoutName = `multi_image_layout_${i}.png`;
+    const outputPath = path.join(outputFolderPath, layoutName);
+    
+    await createImageFromLayout(layout, outputPath);
+    
+    // Assuming a function to determine the item IDs from the selected images
+    const itemIds = selectedImages.map(image => image.id); // Adjust based on your data structure
+    
+    // Add to the layout results including item IDs and the local file path
+    layoutResults.push({
+      itemIds: itemIds,
+      layoutImagePath: outputPath
+    });
+  }
 
-      // Find the corresponding itemIdString for the folder name
-      itemFolderMappings.forEach(({ itemIdString, localFolderName }) => {
-          if (localFolderName === imageFolderName) {
-              // If a match is found, add the itemIdString to the set
-              itemIds.add(itemIdString);
-          }
-      });
-  });
-
-  // Convert the set of item IDs to an array and return
-  return [...itemIds];
+  return layoutResults;
 }
 
-// Helper function to extract the folder name from an image path
-function extractFolderNameFromImagePath(imagePath) {
-  // Assuming imagePath format is like 'specificFolder/itemIdString/dirName'
-  // And that 'dirName' correlates to 'localFolderName'
-  const parts = imagePath.split('/');
-  // Adjust the index as necessary depending on the exact format of your paths
-  return parts[parts.length - 2];
+// Note: This function assumes that images in your categories object have a property 'aspectRatio' and 'path'.
+// You may need to adjust the logic of selectRandomImagesByAspectRatio or the structure of your images 
+// to match these expectations for this function to work correctly.
+
+
+
+async function determineSingleLayout(imagePath) {
+  const metadata = await sharp(imagePath).metadata();
+  const aspectRatio = metadata.width / metadata.height;
+  if (aspectRatio === 1) return createSingleSquareImageLayout(imagePath);
+  else if (aspectRatio > 1) {
+    // Landscape orientation
+    if (aspectRatio >= 16 / 9) return createSingle169LandscapeImageCenteredLayout(imagePath);
+    else return createSingle43LandscapeImageCenteredLayout(imagePath);
+  } else {
+    // Portrait orientation
+    if (aspectRatio <= 9 / 16) return createSingle169PortraitImageCenteredLayout(imagePath);
+    else return createSingle43PortraitImageCenteredLayout(imagePath);
+  }
 }
 
 // Assuming all your function definitions are above this line
@@ -313,7 +360,6 @@ function extractFolderNameFromImagePath(imagePath) {
 module.exports = {
   determineSingleLayout,
   createMultiLayoutImagesWithItemIds,
-  categorizeImage,
   categorizeImages,
   createImageFromLayout
 };

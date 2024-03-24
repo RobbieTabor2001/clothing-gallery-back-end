@@ -87,11 +87,11 @@ function createSingle169LandscapeImageCenteredLayout(imagePath) {
 function createThree169ImagesEvenlySpacedRowsLayout(imagePaths) {
   return {
     width: 1000,
-    height: 1000,
+    height: 1789,
     images: [
-      { imagePath: imagePaths[0], orientation: 'landscape', width: 534, height: 300, position: { x: 233, y: 0 } },
-      { imagePath: imagePaths[1], orientation: 'landscape', width: 534, height: 300, position: { x: 233, y: 350 } },
-      { imagePath: imagePaths[2], orientation: 'landscape', width: 534, height: 300, position: { x: 233, y: 700 } }
+      { imagePath: imagePaths[0], orientation: 'landscape', width: 1000, height: 563, position: { x: 0, y: 0 } },
+      { imagePath: imagePaths[1], orientation: 'landscape', width: 1000, height: 563, position: { x: 0, y: 613 } },
+      { imagePath: imagePaths[2], orientation: 'landscape', width: 1000, height: 563, position: { x: 0, y: 1226 } }
     ]
   };
 }
@@ -99,10 +99,10 @@ function createThree169ImagesEvenlySpacedRowsLayout(imagePaths) {
 function createTwo169ImagesEvenlySpacedRowsLayout(imagePaths) {
   return {
     width: 1000,
-    height: 1000,
+    height: 1176,
     images: [
-      { imagePath: imagePaths[0], orientation: 'landscape', width: 844, height: 475, position: { x: 78, y: 0 } },
-      { imagePath: imagePaths[1], orientation: 'landscape', width: 844, height: 475, position: { x: 78, y: 525 } }
+      { imagePath: imagePaths[0], orientation: 'landscape', width: 1000, height: 563, position: { x: 0, y: 0 } },
+      { imagePath: imagePaths[1], orientation: 'landscape', width: 1000, height: 563, position: { x: 0, y: 613 } }
     ]
   };
 }
@@ -110,11 +110,11 @@ function createTwo169ImagesEvenlySpacedRowsLayout(imagePaths) {
 function createThree169ImagesEvenlySpacedColumnsLayout(imagePaths) {
   return {
     width: 1000,
-    height: 1000,
+    height: 534,
     images: [
-      { imagePath: imagePaths[0], orientation: 'portrait', width: 300, height: 534, position: { x: 0, y: 233 } },
-      { imagePath: imagePaths[1], orientation: 'portrait', width: 300, height: 534, position: { x: 350, y: 233 } },
-      { imagePath: imagePaths[2], orientation: 'portrait', width: 300, height: 534, position: { x: 700, y: 233 } }
+      { imagePath: imagePaths[0], orientation: 'portrait', width: 300, height: 534, position: { x: 0, y: 0 } },
+      { imagePath: imagePaths[1], orientation: 'portrait', width: 300, height: 534, position: { x: 350, y: 0 } },
+      { imagePath: imagePaths[2], orientation: 'portrait', width: 300, height: 534, position: { x: 700, y: 0 } }
     ]
   };
 }
@@ -122,10 +122,10 @@ function createThree169ImagesEvenlySpacedColumnsLayout(imagePaths) {
 function createTwo169ImagesEvenlySpacedColumnsLayout(imagePaths) {
   return {
     width: 1000,
-    height: 1000,
+    height: 844,
     images: [
-      { imagePath: imagePaths[0], orientation: 'portrait', width: 475, height: 844, position: { x: 0, y: 78 } },
-      { imagePath: imagePaths[1], orientation: 'portrait', width: 475, height: 844, position: { x: 525, y: 78 } }
+      { imagePath: imagePaths[0], orientation: 'portrait', width: 475, height: 844, position: { x: 0, y: 0 } },
+      { imagePath: imagePaths[1], orientation: 'portrait', width: 475, height: 844, position: { x: 525, y: 0 } }
     ]
   };
 }
@@ -199,11 +199,11 @@ function createtwoSquareImagesOne169PortaitImage(imagePaths) {
 function createtwoSquareImagesOne169LandscapeImage(imagePaths) {
   return {
     width: 1000,
-    height: 1000,
+    height: 1088,
     images: [
-      { imagePath: imagePaths[0], orientation: 'square', width: 475, height: 475, position: { x: 525, y: 525 } },
-      { imagePath: imagePaths[1], orientation: 'square', width: 475, height: 475, position: { x: 0, y: 525 } },
-      { imagePath: imagePaths[1], orientation: 'landscape', width: 846, height: 475, position: { x: 77, y: 0 } }
+      { imagePath: imagePaths[0], orientation: 'square', width: 475, height: 475, position: { x: 525, y: 613 } },
+      { imagePath: imagePaths[1], orientation: 'square', width: 475, height: 475, position: { x: 0, y: 613 } },
+      { imagePath: imagePaths[1], orientation: 'landscape', width: 1000, height: 563, position: { x: 0, y: 0 } }
     ]
   };
 }
@@ -223,11 +223,11 @@ function createtwoSquareImagesOne169PortaitImageReverse(imagePaths) {
 function createtwoSquareImagesOne169LandscapeImageReverse(imagePaths) {
   return {
     width: 1000,
-    height: 1000,
+    height: 1088,
     images: [
       { imagePath: imagePaths[0], orientation: 'square', width: 475, height: 475, position: { x: 525, y: 0 } },
       { imagePath: imagePaths[1], orientation: 'square', width: 475, height: 475, position: { x: 0, y: 0 } },
-      { imagePath: imagePaths[1], orientation: 'landscape', width: 846, height: 475, position: { x: 77, y: 525 } }
+      { imagePath: imagePaths[1], orientation: 'landscape', width: 1000, height: 563, position: { x: 0, y: 525 } }
     ]
   };
 }
@@ -272,7 +272,8 @@ module.exports = {
   createtwoSquareImagesOne169PortaitImageReverse,
   createtwoSquareImagesOne169LandscapeImageReverse,
   createtwoSquareImagesOne43PortaitImageReverse,
-  createtwoSquareImagesOne43LandscapeImageReverse
+  createtwoSquareImagesOne43LandscapeImageReverse,
+  createfourSquareImagesInCorners
 };
 
 
