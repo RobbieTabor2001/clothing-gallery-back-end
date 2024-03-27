@@ -322,7 +322,7 @@ async function createMultiLayoutImagesWithItemIds(categories, outputFolderPath, 
     await createImageFromLayout(layout, outputPath);
     
     // Assuming a function to determine the item IDs from the selected images
-    const itemIds = selectedImages.map(image => image.id); // Adjust based on your data structure
+    const itemIds = getItemIdsForLayout(itemFolderMappings,layout);// Adjust based on your data structure
     
     // Add to the layout results including item IDs and the local file path
     layoutResults.push({

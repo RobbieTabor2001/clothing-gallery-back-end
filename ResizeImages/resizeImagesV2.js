@@ -69,7 +69,7 @@ async function processFoldersInImages(sourceBaseFolderPath, destinationBaseFolde
     const stat = await fs.stat(folderPath);
     if (!stat.isDirectory()) continue; // Skip files, process only directories
 
-    const outputFolderPath = path.join(destinationBaseFolderPath, folderName, "SquareImages");
+    const outputFolderPath = path.join(destinationBaseFolderPath, folderName, "Images");
     (`Processing ${folderName}...`);
     await processImages(folderPath, outputFolderPath); // Assuming processImages is defined elsewhere
   }

@@ -23,6 +23,23 @@ router.get('/api/images', async (req, res) => {
     }
 });
 
+router.get('/api/paginated-images', async (req, res) => {
+    // Retrieve single and multi-image cursors and limit from query parameters; default limit to 50 if not provided
+    const { cursorSingle, cursorMulti } = req.query;
+    const limit = parseInt(req.query.limit, 10) || 1;
+
+    try {
+        // Fetch paginated image URLs from the service, passing both cursors and the single limit
+        // This method now expects the getAllPaginatedImageURLs method to handle pagination for both image types
+        const paginatedResult = await combinedClothingService.getAllPaginatedImageURLs(cursorSingle, cursorMulti, limit);
+
+        res.status(200).json(paginatedResult);
+    } catch (error) {
+        console.error("Error retrieving paginated images:", error);
+        res.status(500).send("Error retrieving paginated images.");
+    }
+});
+
 router.get('/api/items/:itemId', async (req, res) => {
     const { itemId } = req.params;
     try {

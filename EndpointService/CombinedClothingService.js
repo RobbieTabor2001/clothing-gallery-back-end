@@ -25,64 +25,23 @@ class CombinedClothingService {
         await this.clothingManagementService.disconnect();
     }
 
-
-    async getItemWithImageUrls(itemId) {
-        try {
-            await this.connect();
-            // Use ClothingManagementService to get the item with its MongoDB document images
-            const item = await this.clothingManagementService.getItemWithImagesByType(itemId,1); //1 is square images
-            if (!item) {
-                // (`No item found with ID: ${itemId}`);
-                return null;
-            }
-            // (item);
-            // For each image associated with the item, use getSingleImageVersions to get the dictionary of versions
-            const imageVersionsPromises = item.squareImages.map(async (image) => {
-                // The imagePath directly becomes the s3FolderPath parameter for getSingleImageVersions
-
-                return this.s3Service.getSingleImageVersions(image.imagePath);
-            });
-    
-            // Await all promises to resolve, getting an array of dictionaries for image versions
-            const imagesVersions = await Promise.all(imageVersionsPromises);
-    
-            // Adjust the item structure to include the structured array of image URLs
-            const itemWithImageUrls = {
-                id: item._id, // Assuming you want the item ID here
-                name: item.name,
-                description: item.description,
-                images: imagesVersions // Storing structured image URLs
-            };
-    
-            // (`Item with image URLs retrieved successfully for ID: ${itemId}`);
-            return itemWithImageUrls;
-        } catch (error) {
-            console.error(`Error retrieving item with image URLs for ID: ${itemId}:`, error);
-            throw error;
-        } finally {
-            await this.disconnect();
-        }
-    }
-    
-
     async addNewItemWithImages(localFolderPath, itemData) {
         try {
-            const itemResult = await this.clothingManagementService.insertItemOnly(itemData);
+            const itemResult = await this.clothingManagementService.insertItemDataOnly(itemData);
             const itemIdString = itemResult;
     
             const specificFolders = {
-                'SquareImages': 1,
                 'Images': 0
             };
     
             const imageDetails = []; // To hold the details including type for MongoDB insertion
 
 
-            for (const [specificFolder, imageType] of Object.entries(specificFolders)) {
+            for (const [specificFolder] of Object.entries(specificFolders)) {
                 const specificFolderPath = path.join(localFolderPath, specificFolder);
 
                 if (fs.existsSync(specificFolderPath)) {
-                    await this.uploadFolderAndSubfoldersToS3(specificFolderPath, `${specificFolder.toLowerCase()}/${itemIdString}`, '');
+                    await this.s3Service.uploadFolderAndSubfoldersToS3(specificFolderPath, `${specificFolder.toLowerCase()}/${itemIdString}`, '');
   
                     const imageDirs = fs.readdirSync(specificFolderPath, { withFileTypes: true })
                                     .filter(dirent => dirent.isDirectory())
@@ -91,13 +50,13 @@ class CombinedClothingService {
                     for (const dirName of imageDirs) {
 
                         const imagePath = `${specificFolder.toLowerCase()}/${itemIdString}/${dirName}`;
-                        imageDetails.push({ imagePath, imageType });
+                        imageDetails.push({ imagePath });
                     }
                 }
             }
 
 
-            await this.clothingManagementService.insertImageDetails(itemIdString, imageDetails);
+            await this.clothingManagementService.insertSingleImagesForItem(itemIdString, imageDetails);
     
             // Use local folder name as itemName for return
             const localFolderName = path.basename(localFolderPath);
@@ -124,40 +83,12 @@ class CombinedClothingService {
             throw error;
         }
     }
-    
-    
-    
-    
-    
-    async uploadFolderAndSubfoldersToS3(localFolderPath, s3FolderName, subPath) {
-        const fullPath = path.join(localFolderPath, subPath);
-        const entries = fs.readdirSync(fullPath, { withFileTypes: true });
-    
-        let uploadPromises = [];
-        for (let entry of entries) {
-            const entryPath = path.join(subPath, entry.name);
-            // (entry.name)
-            if (entry.isDirectory()) {
-                const morePromises = await this.uploadFolderAndSubfoldersToS3(localFolderPath, s3FolderName, entryPath);
-                uploadPromises = uploadPromises.concat(morePromises);
-            } else {
-                const localFile = path.join(fullPath, entry.name);
-                const s3Key = `${s3FolderName}/${entryPath}`;
-                // (s3Key);
-                const promise = this.s3Service.uploadFileToS3(localFile, s3Key).then(() => s3Key);
-                uploadPromises.push(promise);
-            }
-        }
-    
-        return Promise.all(uploadPromises);
-    }
-    
 
     async getAllImageURLs() {
         try {
             await this.connect();
             // Retrieve all single image URLs
-            const allSingleImageURLs = await this.s3Service.getAllImageURLs('squareimages');
+            const allSingleImageURLs = await this.s3Service.getAllImageURLs('images');
             // Retrieve all multi image URLs
             const allMultiImageUrls = await this.getAllMultiImageUrls();
             // Return both collections
@@ -170,8 +101,6 @@ class CombinedClothingService {
         }
     }
     
-    
-
     async insertMultiImages(layouts) {
         try {
             for (const layout of layouts) {
@@ -186,7 +115,7 @@ class CombinedClothingService {
                 const s3FolderName = `MultiImages/${parsedPath.name}`;
 
                 // Upload all files from the directory to S3
-                const s3Keys = await this.uploadFolderAndSubfoldersToS3(directoryNameWithoutExtension, s3FolderName, '');
+                const s3Keys = await this.s3Service.uploadFolderAndSubfoldersToS3(directoryNameWithoutExtension, s3FolderName, '');
                 (s3Keys);
                 // Insert multiple image records into MongoDB for all files uploaded
                 if (s3Keys.length > 0) {
@@ -198,13 +127,11 @@ class CombinedClothingService {
                     const multiImageRecord = {
                         itemIds: layout.itemIds,
                         imagePath: baseS3FolderPath,
-                        imageType: 1 // Assuming imageType is determined by some logic or is provided; placeholder here
                     };
                     (multiImageRecord);
-                    await this.clothingManagementService.insertMultiImage(
+                    await this.clothingManagementService.insertOneMultiImage(
                         multiImageRecord.itemIds,
                         multiImageRecord.imagePath,
-                        multiImageRecord.imageType
                     );
                 }
             }
@@ -241,6 +168,49 @@ class CombinedClothingService {
             await this.disconnect();
         }
     }
+    
+    async getAllPaginatedImageURLs(cursorSingle, cursorMulti, limit = 50) {
+        try {
+            await this.connect();
+            // Fetch paginated images and multi-images from MongoDB
+            const paginatedResults = await this.clothingManagementService.getAllPaginatedImages(cursorSingle, cursorMulti, limit);
+            
+            // Retrieve S3 URLs for individual images
+            const singleImagesWithUrls = await Promise.all(paginatedResults.singleImages.images.map(async image => {
+                const imageUrls = await this.s3Service.getSingleImageVersions(image.imagePath);
+                return {         
+                    imageId: image._id,
+                    itemIds: [image.itemId], // Ensuring itemIds are strings
+                ...imageUrls};
+            }));
+    
+            // Retrieve S3 URLs for multi-images
+            const multiImagesWithUrls = await Promise.all(paginatedResults.multiImages.images.map(async image => {
+                const imageUrls = await this.s3Service.getSingleImageVersions(image.imagePath);
+                return {
+                    imageId: image._id,
+                    itemIds: image.itemIds, // Ensuring itemIds are strings
+                ...imageUrls};
+            }));
+    
+            // Combine single and multi-images into one array
+            const combinedImagesWithUrls = [...singleImagesWithUrls, ...multiImagesWithUrls];
+    
+            // Combine and return the results
+            return {
+                images: combinedImagesWithUrls,
+                nextCursorSingle: paginatedResults.singleImages.nextCursor,
+                nextCursorMulti: paginatedResults.multiImages.nextCursor,
+            };
+        } catch (error) {
+            console.error("Error in getAllPaginatedImageURLs:", error);
+            throw error;
+        } finally {
+            // Ensures the service is disconnected regardless of the method's outcome
+            await this.disconnect();
+        }
+    }
+    
     
 
 }

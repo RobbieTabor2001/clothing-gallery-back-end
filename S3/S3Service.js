@@ -8,23 +8,29 @@ class S3Service {
         this.bucketName = process.env.AWS_S3_BUCKET;
     }
 
-    // Method to get an image by file path
-    async getImage(filePath) {
-        const params = {
-            Bucket: this.bucketName,
-            Key: filePath,
-        };
-
-        try {
-            // This example assumes you want to download the image. If you just want to get the URL, adjust accordingly.
-            const data = await this.s3.getObject(params).promise();
-            // (`Image fetched successfully.`);
-            return data.Body;
-        } catch (error) {
-            console.error("Error fetching image:", error);
-            throw error;
+    async uploadFolderAndSubfoldersToS3(localFolderPath, s3FolderName, subPath) {
+        const fullPath = path.join(localFolderPath, subPath);
+        const entries = fs.readdirSync(fullPath, { withFileTypes: true });
+    
+        let uploadPromises = [];
+        for (let entry of entries) {
+            const entryPath = path.join(subPath, entry.name);
+            // (entry.name)
+            if (entry.isDirectory()) {
+                const morePromises = await this.uploadFolderAndSubfoldersToS3(localFolderPath, s3FolderName, entryPath);
+                uploadPromises = uploadPromises.concat(morePromises);
+            } else {
+                const localFile = path.join(fullPath, entry.name);
+                const s3Key = `${s3FolderName}/${entryPath}`;
+                // (s3Key);
+                const promise = this.uploadFileToS3(localFile, s3Key).then(() => s3Key);
+                uploadPromises.push(promise);
+            }
         }
+    
+        return Promise.all(uploadPromises);
     }
+
     async getImageUrl(filePath) {
         const params = {
             Bucket: this.bucketName,
@@ -42,96 +48,6 @@ class S3Service {
             throw error;
         }
     }
-    
-
-    // Method to upload a collection of images into a folder
-    async uploadFolderToS3(localFolderPath, s3FolderName) {
-        const uploadDirectoryRecursive = async (localPath, s3Path) => {
-            // Get all items in the directory
-            const items = fs.readdirSync(localPath, { withFileTypes: true });
-    
-            const uploadPromises = items.map(item => {
-                const localItemPath = path.join(localPath, item.name);
-                const s3ItemPath = `${s3Path}/${item.name}`;
-    
-                if (item.isDirectory()) {
-                    // Recursively upload items in subdirectory
-                    return uploadDirectoryRecursive(localItemPath, s3ItemPath);
-                } else {
-                    // Read file content and upload it to S3
-                    const fileContent = fs.readFileSync(localItemPath);
-                    return this.s3.upload({
-                        Bucket: this.bucketName,
-                        Key: s3ItemPath,
-                        Body: fileContent,
-                        // ACL: 'public-read', // Uncomment or modify according to your S3 policy
-                    }).promise();
-                }
-            });
-    
-            // Wait for all the upload promises to resolve
-            return Promise.all(uploadPromises);
-        };
-    
-        // Start the recursive upload from the root directory
-        return uploadDirectoryRecursive(localFolderPath, s3FolderName);
-    }
-
-    async deleteFolder(s3FolderName) {
-        const listParams = {
-            Bucket: this.bucketName,
-            Prefix: `${s3FolderName}/`, // Ensure the folder name ends with a slash
-        };
-
-        try {
-            const listedObjects = await this.s3.listObjectsV2(listParams).promise();
-
-            if (listedObjects.Contents.length === 0) return;
-
-            const deleteParams = {
-                Bucket: this.bucketName,
-                Delete: { Objects: [] },
-            };
-
-            listedObjects.Contents.forEach(({ Key }) => {
-                deleteParams.Delete.Objects.push({ Key });
-            });
-
-            await this.s3.deleteObjects(deleteParams).promise();
-
-            if (listedObjects.IsTruncated) await this.deleteFolder(s3FolderName); // Recurse to delete more if the list is truncated
-            // (`${s3FolderName} deleted successfully.`);
-        } catch (error) {
-            console.error("Error deleting folder:", error);
-            throw error;
-        }
-    }
-
-    // Method to read a folder and get all images
-    async readFolder(s3FolderName) {
-        const params = {
-            Bucket: this.bucketName,
-            Prefix: `${s3FolderName}/`,
-        };
-
-        try {
-            const data = await this.s3.listObjectsV2(params).promise();
-            const images = data.Contents.map(item => item.Key);
-            // (`Images in ${s3FolderName}:`, images);
-            return images;
-        } catch (error) {
-            console.error("Error reading folder:", error);
-            throw error;
-        }
-    }
-
-    // Method to update a folder (replace its images)
-    async updateFolder(localFolderPath, s3FolderName) {
-        // Delete existing folder contents
-        await this.deleteFolder(s3FolderName);
-        // Upload new contents from the local folder
-        return await this.uploadFolderToS3(localFolderPath, s3FolderName);
-    }
 
     async getSingleImageVersions(s3FolderPath) {
         const listParams = {
@@ -148,7 +64,6 @@ class S3Service {
     
             // Initialize an object to hold image URLs organized by size
             let imagesDetails = {
-                imageName: '',
                 small: { compressed: null, lossless: null },
                 medium: { compressed: null, lossless: null },
                 large: { compressed: null, lossless: null },
@@ -193,10 +108,6 @@ class S3Service {
         }
     }
     
-    
-    
-    
-    
     async uploadFileToS3(filePath, s3Key) {
         const fileContent = fs.readFileSync(filePath);
         const params = {
@@ -207,11 +118,12 @@ class S3Service {
         return this.s3.upload(params).promise();
     }
 
+    //directly pulls everything out of Images folder without params
     async getAllImageURLs() {
         try {
             const listParams = {
                 Bucket: this.bucketName,
-                Prefix: 'squareimages/', // List all objects under the 'images/' folder
+                Prefix: 'images/', // List all objects under the 'images/' folder
             };
     
             const sizeMap = {
@@ -282,16 +194,7 @@ class S3Service {
             console.error("Error retrieving all image URLs:", error);
             throw error;
         }
-    }
-    
-    
-    
-    
-
-    
-    
-    
-    
+    }   
 }
 
 module.exports = S3Service;

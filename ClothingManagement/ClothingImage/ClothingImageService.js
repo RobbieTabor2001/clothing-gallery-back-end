@@ -126,11 +126,10 @@ class ClothingImageService {
     async bulkInsertImages(imagesData) {
         try {
             // Ensure that all itemId values are correctly formatted as ObjectId instances
-            // and handle the inclusion of imageType
+
             const formattedImagesData = imagesData.map(data => ({
                 ...data,
                 itemId: data.itemId
-                // No need to convert imageType, assuming it's correctly provided as 0 or 1
             }));
     
             const result = await this.collection.insertMany(formattedImagesData);
@@ -142,19 +141,39 @@ class ClothingImageService {
         }
     }
 
-    async getImagesForItemByType(itemId, imageType) {
+    async getImagesForItemByType(itemId) {
         try {
             const itemObjectId =  itemId;
-            const images = await this.collection.find({ itemId: itemObjectId, imageType: imageType }).toArray();
+            const images = await this.collection.find({ itemId: itemObjectId}).toArray();
             if (images.length > 0) {
-                // (`Fetched ${images.length} image(s) of type ${imageType} for item with ID: ${itemId}`);
                 return images;
             } else {
-                // (`No images of type ${imageType} found for item with ID: ${itemId}`);
                 return [];
             }
         } catch (error) {
-            console.error(`Error fetching images of type ${imageType} for item with ID: ${itemId}:`, error);
+            console.error(`Error fetching images for item with ID: ${itemId}:`, error);
+            throw error;
+        }
+    }
+    
+    async getPaginatedImages(cursor, limit = 50) {
+        try {
+            // Prepare the query with cursor if provided
+            const query = cursor ? { _id: { $gt: cursor } } : {};
+    
+            // Execute the find operation with the query, sort by _id ascending, and apply the limit
+            const images = await this.collection.find(query).sort({ _id: 1 }).limit(limit).toArray();
+    
+            // Determine the next cursor value if there are more documents to paginate through
+            const nextCursor = images.length === limit ? images[images.length - 1]._id.toString() : null;
+    
+            return {
+                images,
+                nextCursor,
+                limit,
+            };
+        } catch (error) {
+            console.error("Error in getPaginatedImages:", error);
             throw error;
         }
     }

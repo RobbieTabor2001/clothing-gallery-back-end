@@ -61,35 +61,15 @@ class MultiClothingImageService {
         }
     }
     
-    async getMultiImagesByType(imageType) {
-        try {
-            // Validate imageType parameter to ensure it's within expected range/values
-            if (![0, 1].includes(imageType)) {
-                throw new Error("Invalid image type specified. Expected 0 for square or 1 for non-square.");
-            }
-    
-            const images = await this.collection.find({ imageType: imageType }).toArray();
-            if (images.length > 0) {
-                // (`Fetched ${images.length} multi-image document(s) of type ${imageType}.`);
-            } else {
-                // (`No multi-image documents found of type ${imageType}.`);
-            }
-            return images;
-        } catch (error) {
-            console.error(`Error fetching multi-image documents of type ${imageType}:`, error);
-            throw error;
-        }
-    }
+
     
 
-    async insertOneMultiImage(itemIds, imagePath, imageType) {
+    async insertOneMultiImage(itemIds, imagePath) {
         try {
             const formattedItemIds = itemIds.map(id => id);
             const document = {
                 itemIds: formattedItemIds,
                 imagePath: imagePath,
-                // Add imageType to the document
-                imageType: imageType // Assuming imageType is passed as a parameter (0 for square, 1 for non-square)
             };
             const result = await this.collection.insertOne(document);
             //console.log("Inserted one multi-image document:", result);
@@ -105,7 +85,6 @@ class MultiClothingImageService {
             const documents = multiImages.map(img => ({
                 itemIds: img.itemIds.map(id => id),
                 imagePath: img.imagePath,
-                imageType: img.imageType // Assuming each img object includes an imageType property
             }));
             const result = await this.collection.insertMany(documents);
             // (`Inserted ${result.insertedCount} multi-image documents.`);
@@ -116,7 +95,7 @@ class MultiClothingImageService {
         }
     }
 
-    async deleteByItemId(itemId) {
+    async deleteMultiImageByItemId(itemId) {
         try {
             const itemObjectId = itemId;
             const result = await this.collection.deleteMany({
@@ -130,6 +109,31 @@ class MultiClothingImageService {
             return result;
         } catch (error) {
             console.error(`Error deleting multi-image documents containing item ID: ${itemId}:`, error);
+            throw error;
+        }
+    }
+
+    async getPaginatedMultiImages(cursor, limit = 50) {
+        try {
+            // Prepare the query with cursor if provided
+            let query = {};
+            if (cursor) {
+                query._id = { $gt: cursor };
+            }
+
+            // Execute the find operation with the query, sort by _id ascending, and apply the limit
+            const multiImages = await this.collection.find(query).sort({_id: 1}).limit(limit).toArray();
+
+            // Determine the next cursor value if there are more documents to paginate through
+            let nextCursor = multiImages.length === limit ? multiImages[multiImages.length - 1]._id.toString() : null;
+
+            return {
+                multiImages,
+                nextCursor,
+                limit,
+            };
+        } catch (error) {
+            console.error("Error in getPaginatedMultiImages:", error);
             throw error;
         }
     }
