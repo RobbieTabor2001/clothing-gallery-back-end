@@ -118,12 +118,11 @@ class MultiClothingImageService {
             // Prepare the query with cursor if provided
             let query = {};
             if (cursor) {
-                query._id = { $gt: cursor };
+                query._id = { $gt: new ObjectId(cursor) };
             }
 
             // Execute the find operation with the query, sort by _id ascending, and apply the limit
             const multiImages = await this.collection.find(query).sort({_id: 1}).limit(limit).toArray();
-
             // Determine the next cursor value if there are more documents to paginate through
             let nextCursor = multiImages.length === limit ? multiImages[multiImages.length - 1]._id.toString() : null;
 

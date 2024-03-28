@@ -26,7 +26,7 @@ router.get('/api/images', async (req, res) => {
 router.get('/api/paginated-images', async (req, res) => {
     // Retrieve single and multi-image cursors and limit from query parameters; default limit to 50 if not provided
     const { cursorSingle, cursorMulti } = req.query;
-    const limit = parseInt(req.query.limit, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 25;
 
     try {
         // Fetch paginated image URLs from the service, passing both cursors and the single limit

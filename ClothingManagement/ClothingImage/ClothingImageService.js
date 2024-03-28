@@ -159,11 +159,12 @@ class ClothingImageService {
     async getPaginatedImages(cursor, limit = 50) {
         try {
             // Prepare the query with cursor if provided
-            const query = cursor ? { _id: { $gt: cursor } } : {};
-    
+            const query = cursor ? { _id: { $gt: new ObjectId(cursor) } } : {};
+
+            console.log(query);
             // Execute the find operation with the query, sort by _id ascending, and apply the limit
             const images = await this.collection.find(query).sort({ _id: 1 }).limit(limit).toArray();
-    
+
             // Determine the next cursor value if there are more documents to paginate through
             const nextCursor = images.length === limit ? images[images.length - 1]._id.toString() : null;
     
